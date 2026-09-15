@@ -1,0 +1,11 @@
+node_modules/
+test-results/
+playwright-report/
+dashboard-history/
+dashboard-screenshots/
+run-reports/
+screenshot/
+*.log
+.claude/
+.agents/
+~$*.xlsx

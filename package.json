@@ -1,0 +1,38 @@
+{
+  "name": "appointment-module-playwright-js",
+  "version": "1.0.0",
+  "description": "Playwright JS test suite for Appointment Module (converted from Java)",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:candidate": "npx playwright test tests/Candidate --headed",
+    "test:signupsignin": "npx playwright test tests/Candidate/SignUpSignIn.spec.js --headed",
+    "test:phase1": "npx playwright test tests/Candidate/Phase1.spec.js --headed",
+    "test:phase2": "npx playwright test tests/Candidate/Phase2.spec.js --headed",
+    "test:interview": "npx playwright test tests/Interview tests/Interview.spec.js --headed",
+    "test:interview-setup": "npx playwright test tests/Interview/Setup.spec.js --headed",
+    "test:interview-interviewer-email": "npx playwright test tests/Interview/PreviewInterviewerEmail.spec.js --headed",
+    "test:interview-candidate-email": "npx playwright test tests/Interview/PreviewCandidateEmail.spec.js --headed",
+    "test:interview-statusfeedback": "npx playwright test tests/Interview/StatusFeedback.spec.js --headed",
+    "test:onboarding": "npx playwright test tests/Onboarding tests/Onboarding.spec.js --headed",
+    "test:hr-docverification": "npx playwright test tests/HR/DocumentVerification.spec.js --headed",
+    "test:onboarding-offerletter": "npx playwright test tests/Onboarding/GenOfferLetter.spec.js --headed",
+    "test:onboarding-appointmentletter": "npx playwright test tests/Onboarding/GenAppointmentLetter.spec.js --headed",
+    "test:onboarding-apprenticeletter": "npx playwright test tests/Onboarding/GenApprenticeLetter.spec.js --headed",
+    "test:training": "npx playwright test tests/Training.spec.js --headed",
+    "test:opentraining": "npx playwright test tests/OpenTraining.spec.js --headed",
+    "report": "npx playwright show-report",
+    "run": "npx playwright test tests/Candidate --headed",
+    "dashboard": "node server.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0"
+  },
+  "dependencies": {
+    "child_process": "^1.0.2",
+    "cors": "^2.8.6",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "openai": "^6.34.0"
+  }
+}

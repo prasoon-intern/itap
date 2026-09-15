@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Automation Test Dashboard</title>
+<style>
+  :root {
+    --ink: #1a2233; --sidebar: #171d2b; --sidebar-2: #232b3d; --sidebar-line: #2c3548;
+    --line: #e3e8f0; --accent: #3d8bfd; --accent-dark: #2a6fd6;
+    --good: #1a7f4b; --good-bg: #e7f6ee; --bad: #c0392b; --bad-bg: #fbeaea;
+    --muted: #64748b; --page: #f5f7fb; --warn: #b9790a; --warn-bg: #fdf3e0;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: var(--page); color: var(--ink); font-size: 14px; }
+  .app { display: grid; grid-template-columns: 250px 1fr; min-height: 100vh; }
+
+  /* ---- Sidebar ---- */
+  .sidebar { background: var(--sidebar); color: #cbd3e1; padding: 20px 14px; display: flex; flex-direction: column; }
+  .brand { color: #fff; font-weight: 800; font-size: 1.32em; letter-spacing: 0.01em; white-space: nowrap; margin-bottom: 18px; padding: 0 8px; }
+  .nav-section { font-size: 0.7em; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7690; margin: 8px 8px 8px; font-weight: 700; }
+  .nav-section.modules-title { color: #fff; font-size: 0.85em; }
+  .nav-item { display: flex; justify-content: space-between; align-items: center; padding: 11px 12px; border-radius: 8px; margin-bottom: 3px; cursor: pointer; font-size: 0.92em; border: none; background: none; width: 100%; text-align: left; color: #cbd3e1; font-family: inherit; }
+  .nav-item:hover { background: var(--sidebar-2); }
+  .nav-item.active { background: var(--accent); color: #fff; font-weight: 600; }
+  .nav-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .nav-item .dot.good { background: #34d399; }
+  .nav-item .dot.bad { background: #f87171; }
+  .nav-item .dot.none { background: #4b5570; }
+  .nav-item .dot.running { background: #60a5fa; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .sidebar-foot { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--sidebar-line); }
+  .sidebar-link { display: block; color: #9aa5bd; text-decoration: none; font-size: 0.85em; padding: 8px 12px; border-radius: 8px; }
+  .sidebar-link:hover { background: var(--sidebar-2); color: #fff; }
+  .mode-toggle { display: flex; gap: 4px; background: var(--sidebar-2); border-radius: 8px; padding: 3px; margin: 4px 12px 0; }
+  .mode-toggle-btn { flex: 1; border: none; background: none; color: #9aa5bd; font-family: inherit; font-size: 0.82em; font-weight: 600; padding: 7px 0; border-radius: 6px; cursor: pointer; }
+  .mode-toggle-btn.active { background: var(--accent); color: #fff; }
+  .mode-toggle-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+  .mode-toggle-hint { padding: 6px 12px 0; font-size: 0.74em; color: #6b7690; line-height: 1.4; }
+
+  /* ---- Main ---- */
+  .main { padding: 26px 34px 50px; max-width: 1080px; }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; gap: 20px; }
+  .header-row h1 { font-size: 1.4em; margin: 0; }
+  .header-row .meta { color: var(--muted); font-size: 0.85em; margin-top: 4px; }
+  .header-actions { display: flex; gap: 10px; flex-shrink: 0; }
+  .btn { border: none; border-radius: 8px; padding: 10px 18px; font-size: 0.88em; font-weight: 700; cursor: pointer; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover:not(:disabled) { background: var(--accent-dark); }
+  .btn.ghost { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+  .btn.ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-dark); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .banner { background: #eaf1ff; border: 1px solid #c9dcff; color: #1c4c9c; padding: 10px 16px; border-radius: 10px; font-size: 0.85em; margin-bottom: 16px; }
+
+  .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+  .stat { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+  .stat .num { font-size: 1.5em; font-weight: 800; }
+  .stat .lbl { font-size: 0.76em; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .stat.pass .num { color: var(--good); }
+  .stat.fail .num { color: var(--bad); }
+
+  .progress-track { height: 7px; background: #e3e8f0; border-radius: 999px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.3s ease; width: 0%; }
+
+  .live-panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; }
+  .live-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.9em; }
+  .live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); animation: pulse 1s infinite; flex-shrink: 0; }
+  #liveNowText { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .live-elapsed { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.85em; flex-shrink: 0; }
+
+  .run-outcome-banner { padding: 12px 16px; border-radius: 10px; font-size: 0.87em; margin-bottom: 18px; }
+  .run-outcome-banner.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid #f3dfae; }
+  .run-outcome-banner.stopped { background: #eef1f6; color: var(--muted); border: 1px solid var(--line); }
+
+  .all-pass-strip { display: flex; align-items: center; gap: 8px; color: var(--good); font-size: 0.88em; font-weight: 600; margin-bottom: 18px; padding: 2px 2px; }
+
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 18px; overflow: hidden; }
+  .card-head { padding: 14px 20px; border-bottom: 1px solid var(--line); font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  .card-head .sub { font-weight: 400; color: var(--muted); font-size: 0.8em; }
+  .card.failures { border: 1px solid #f2c9c9; }
+  .card.failures .card-head { background: var(--bad-bg); color: var(--bad); border-bottom-color: #f2c9c9; }
+
+  .run-options-body { padding: 16px 20px; }
+  .mode-choice { display: flex; gap: 16px; margin-bottom: 4px; }
+  .mode-choice label { display: flex; align-items: center; gap: 6px; font-size: 0.92em; cursor: pointer; }
+  .checklist { max-height: 260px; overflow-y: auto; border: 1px solid #e2e8f2; border-radius: 8px; background: #f8fafc; padding: 6px 4px; margin-top: 14px; }
+  .checklist-group-title { font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); font-weight: 700; padding: 8px 10px 4px; }
+  .checklist-row { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 6px; font-size: 0.9em; }
+  .checklist-row:hover { background: #eef4ff; }
+  .checklist-row input { width: auto; margin: 0; }
+  .checklist-actions { display: flex; gap: 10px; margin-top: 8px; align-items: center; }
+  .checklist-actions button { background: none; border: none; color: var(--accent); font-size: 0.85em; cursor: pointer; padding: 0; font-weight: 600; }
+  .checklist-actions button:hover { text-decoration: underline; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); padding: 8px 20px; background: #f8fafc; font-weight: 700; }
+  td { padding: 12px 20px; border-top: 1px solid #f0f2f6; font-size: 0.88em; vertical-align: top; }
+  table.results-table, table.failures-table { table-layout: fixed; }
+  table.results-table td, table.results-table th, table.failures-table td, table.failures-table th { overflow-wrap: break-word; padding-left: 10px; padding-right: 10px; }
+  /* The "#" column is intentionally narrow (3%) - overflow-wrap above would
+     otherwise break a two-digit row number like "12" onto two lines
+     ("1" / "2") since it's the only column allowed to break mid-word. */
+  table.results-table td:first-child, table.failures-table td:first-child { white-space: nowrap; overflow-wrap: normal; }
+  tr.row-fail td { background: #fffafa; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.76em; font-weight: 700; white-space: nowrap; }
+  .badge.passed { background: var(--good-bg); color: var(--good); }
+  .badge.failed, .badge.timedOut { background: var(--bad-bg); color: var(--bad); }
+  .badge.stopped { background: var(--warn-bg); color: var(--warn); }
+  .badge.skipped, .badge.queued, .badge.running { background: #eef1f6; color: var(--muted); }
+  .link { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.85em; }
+  .link:hover { text-decoration: underline; }
+  .muted { color: var(--muted); font-size: 0.82em; }
+  .error-text { color: var(--bad); font-size: 0.82em; margin-top: 3px; font-family: Consolas, monospace; }
+  .skip-text { color: var(--warn); font-size: 0.85em; }
+  .passed-check { color: var(--good); font-weight: 600; font-size: 0.85em; white-space: nowrap; }
+  tr.row-skip td { background: #fffdf7; }
+
+  .history-row { cursor: pointer; }
+  .history-row:hover { background: #f3f8ff; }
+  .history-row.viewing { background: #eaf1ff; }
+
+  .empty-note { padding: 24px; text-align: center; color: var(--muted); font-size: 0.9em; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="brand">ITAP AUTOMATION</div>
+    <button type="button" class="btn primary" id="runFullSuiteBtn" style="width:100%; margin-bottom:8px;">▶ Run Everything</button>
+    <button type="button" class="btn ghost" id="resumeBtn" style="width:100%; margin-bottom:14px; display:none;">↻ Resume Where It Stopped</button>
+    <div class="nav-section modules-title">Modules</div>
+    <div id="projectNav"></div>
+    <div class="sidebar-foot">
+      <a class="sidebar-link" id="reportLink" href="#" target="_blank">Full Playwright Report ↗</a>
+      <div class="nav-section" style="margin-top:14px;">Browser Mode</div>
+      <div class="mode-toggle" id="modeToggle">
+        <button type="button" class="mode-toggle-btn active" data-headless="false">Headed</button>
+        <button type="button" class="mode-toggle-btn" data-headless="true">Headless</button>
+      </div>
+      <div class="mode-toggle-hint" id="modeToggleHint">Browser window will be visible while tests run.</div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="crossRunBanner"></div>
+    <div id="fullSuiteBanner" style="display:none;"></div>
+
+    <div class="header-row">
+      <div>
+        <h1 id="projTitle">Loading…</h1>
+        <div class="meta" id="projMeta"></div>
+      </div>
+      <div class="header-actions">
+        <button class="btn ghost" id="toggleOptionsBtn">Run Options</button>
+        <button class="btn primary" id="runAllBtn">▶ Run All</button>
+        <button class="btn ghost" id="stopBtn" disabled>■ Stop</button>
+      </div>
+    </div>
+
+    <div class="live-panel" id="livePanel" style="display:none;">
+      <div class="live-row">
+        <span class="live-dot"></span>
+        <span id="liveNowText">Starting…</span>
+        <span class="live-elapsed" id="liveElapsed">0:00</span>
+      </div>
+      <div class="progress-track active"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <div class="run-outcome-banner" id="runOutcomeBanner" style="display:none;"></div>
+
+    <div class="stat-strip" id="statStrip"></div>
+
+    <div class="card" id="runOptionsCard" style="display:none;">
+      <div class="card-head"><span>Run Options</span> <button type="button" class="btn ghost" id="refreshTestsBtn" style="padding:5px 12px; font-size:0.8em;">↻ Refresh Test List</button></div>
+      <div class="run-options-body">
+        <div class="mode-choice">
+          <label><input type="radio" name="runMode" value="all" checked> Run All Tests</label>
+          <label><input type="radio" name="runMode" value="specific"> Choose Specific Tests</label>
+        </div>
+        <div id="checklistWrap" style="display:none;">
+          <div class="checklist" id="checklist"><div class="muted" style="padding:10px;">Loading tests…</div></div>
+          <div class="checklist-actions">
+            <button type="button" id="selectAllBtn">Select all</button>
+            <button type="button" id="clearAllBtn">Clear</button>
+            <span class="muted" id="selectedCount" style="margin-left:auto;"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="all-pass-strip" id="allPassStrip" style="display:none;">✓ All tests passed on the last run.</div>
+
+    <div class="card failures" id="failuresCard" style="display:none;">
+      <div class="card-head"><span>Failing</span> <span class="sub" id="failuresSub"></span></div>
+      <table class="failures-table">
+        <colgroup>
+          <col style="width:5%"><col style="width:16%"><col style="width:31%"><col style="width:26%"><col style="width:9%"><col style="width:13%">
+        </colgroup>
+        <thead><tr><th>#</th><th>Test Case</th><th>Description</th><th>Reason</th><th>Duration</th><th>Screenshot</th></tr></thead>
+        <tbody id="failuresBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card" id="resultsCard" style="display:none;">
+      <div class="card-head">
+        <span>Results — <span id="resultsRunLabel"></span></span>
+        <button type="button" class="btn ghost" id="downloadReportBtn" style="padding:5px 12px; font-size:0.8em;">⬇ Download Report</button>
+      </div>
+      <table class="results-table">
+        <colgroup>
+          <col style="width:3%"><col style="width:10%"><col style="width:26%"><col style="width:20%"><col style="width:9%"><col style="width:11%"><col style="width:21%">
+        </colgroup>
+        <thead><tr><th>#</th><th>Test Case</th><th>Description</th><th>Reason</th><th>Duration</th><th>Status</th><th>Screenshot</th></tr></thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Recent Runs</div>
+      <table><tbody id="historyBody">
+        <tr><td class="empty-note">No runs yet for this project.</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+const projectNav = document.getElementById('projectNav');
+const projTitle = document.getElementById('projTitle');
+const projMeta = document.getElementById('projMeta');
+const runAllBtn = document.getElementById('runAllBtn');
+const runFullSuiteBtn = document.getElementById('runFullSuiteBtn');
+const resumeBtn = document.getElementById('resumeBtn');
+const fullSuiteBanner = document.getElementById('fullSuiteBanner');
+const stopBtn = document.getElementById('stopBtn');
+const toggleOptionsBtn = document.getElementById('toggleOptionsBtn');
+const runOptionsCard = document.getElementById('runOptionsCard');
+const checklistWrap = document.getElementById('checklistWrap');
+const checklist = document.getElementById('checklist');
+const selectedCountEl = document.getElementById('selectedCount');
+const statStrip = document.getElementById('statStrip');
+const livePanel = document.getElementById('livePanel');
+const liveNowText = document.getElementById('liveNowText');
+const liveElapsed = document.getElementById('liveElapsed');
+const progressFill = document.getElementById('progressFill');
+const runOutcomeBanner = document.getElementById('runOutcomeBanner');
+const allPassStrip = document.getElementById('allPassStrip');
+const failuresCard = document.getElementById('failuresCard');
+const failuresSub = document.getElementById('failuresSub');
+const failuresBody = document.getElementById('failuresBody');
+const resultsCard = document.getElementById('resultsCard');
+const resultsBody = document.getElementById('resultsBody');
+const resultsRunLabel = document.getElementById('resultsRunLabel');
+const historyBody = document.getElementById('historyBody');
+const reportLink = document.getElementById('reportLink');
+const modeToggle = document.getElementById('modeToggle');
+const modeToggleHint = document.getElementById('modeToggleHint');
+let wantHeadless = false;
+
+modeToggle.querySelectorAll('.mode-toggle-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    wantHeadless = btn.dataset.headless === 'true';
+    modeToggle.querySelectorAll('.mode-toggle-btn').forEach((b) => b.classList.toggle('active', b === btn));
+    modeToggleHint.textContent = wantHeadless
+      ? 'Browser window stays hidden — faster, good for running many tests.'
+      : 'Browser window will be visible while tests run.';
+  });
+});
+const crossRunBanner = document.getElementById('crossRunBanner');
+
+let projects = [];
+let currentProjectId = null;
+let currentTests = [];
+let selectedKeys = new Set();
+let projectHealth = {};   // { [id]: { status: 'good'|'bad'|'none'|'running', lastRun } }
+let historyCache = {};    // { [id]: [...] }
+let displayedReport = null;
+let runState = { running: false, project: null, testCount: 0, done: 0, passed: 0, failed: 0, tests: [], runningKey: null, startedAt: null };
+let elapsedTimerHandle = null;
+
+function testKey(file, line) { return `${file}:${line}`; }
+
+function formatElapsed(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function titleForKey(key) {
+  const t = runState.tests.find((x) => x.key === key);
+  return t ? t.title : key;
+}
+
+function updateLivePanelText() {
+  if (runState.project !== currentProjectId) return;
+  const nowTitle = runState.runningKey ? titleForKey(runState.runningKey) : '…';
+  const inFlightCount = Math.min(runState.done + 1, runState.testCount);
+  liveNowText.textContent = `RUNNING: ${inFlightCount} / ${runState.testCount} — ${nowTitle}`;
+  if (runState.startedAt) liveElapsed.textContent = formatElapsed(Date.now() - runState.startedAt);
+  const pct = runState.testCount ? Math.round((runState.done / runState.testCount) * 100) : 0;
+  progressFill.style.width = pct + '%';
+}
+
+function startElapsedTicker() {
+  stopElapsedTicker();
+  elapsedTimerHandle = setInterval(() => {
+    if (runState.running) updateLivePanelText();
+  }, 1000);
+}
+function stopElapsedTicker() {
+  if (elapsedTimerHandle) { clearInterval(elapsedTimerHandle); elapsedTimerHandle = null; }
+}
+function statusLabel(s) { return { passed: 'Passed', failed: 'Failed', timedOut: 'Timed Out', running: 'Running', queued: 'Queued', skipped: 'Skipped', stopped: 'Stopped' }[s] || s; }
+function formatDuration(ms) {
+  if (!ms || ms <= 0) return '—';
+  if (ms < 1000) return Math.round(ms) + 'ms';
+  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+  return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+}
+function timeAgo(iso) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+// Test titles already carry a short plain-English description after a
+// separator ("TC-016: rejects a malformed PAN number", "TC_MR_N01 - blank
+// Candidate Name is rejected") — split that off so it can render as its own
+// small line under the test's ID/name instead of one long run-on string.
+function splitTitle(title) {
+  let m = title.match(/^(.*?):\s+(.+)$/);
+  if (m) return { id: m[1].trim(), desc: m[2].trim() };
+  m = title.match(/^(.*?)\s+-\s+(.+)$/);
+  if (m) return { id: m[1].trim(), desc: m[2].trim() };
+  return { id: title.trim(), desc: '' };
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Positive/Negative/Edge classification for every test that doesn't already
+// self-describe it in its own ID (Interview/Onboarding's own titles carry a
+// "[Positive]"/"[Negative]"/"[Edge]" tag, parsed directly by classifyTest()
+// below). Everything below is keyed by the test's exact title: the Sign Up
+// / Sign In / Phase 1 / Phase 2 validation suites, plus Manager Referral
+// (whose titles are just the workbook's own bare TC_id, with no category
+// embedded in the title text itself, so every one of its tests needs an
+// entry here). candidateform.spec.js's happy-path steps have no entry here
+// and fall back to Positive by default, since every one of them is part of
+// the happy path.
+const MANUAL_TEST_CATEGORY = {
+  // Candidate Signup
+  'TC-001/002: rejects a non-numeric or short Aadhaar number': 'N',
+  'TC-003: rejects signup with an already-registered Aadhaar number': 'N',
+  'TC-004: rejects an invalid / official Mankind email address': 'N',
+  'TC-005: rejects mismatched New Password / Confirm Password': 'N',
+  'TC-006: shows the password policy tooltip and enforces it': 'N',
+  'TC-007: rejects an invalid Manager Reference ID': 'N',
+  'TC-008: blocks submission when the acknowledgement checkbox is unchecked': 'N',
+  'TC-009: shows per-field validation on a fully blank form submit': 'N',
+  'TC-010: toggles between Sign Up and Sign In modals': 'P',
+  'TC-011: closing the Signup modal mid-entry and reopening it clears the form': 'E',
+  'E01: Aadhaar Number field enforces the 12-digit maximum length on both forms': 'E',
+  'E02: Manager Reference ID field enforces the 8-character maximum length': 'E',
+  'E03: Email field accepts up to its 200-character maximum length': 'E',
+  'E04: Password / Confirm Password fields enforce their 50-character maximum': 'E',
+  'E05: leading whitespace in Aadhaar Number is not trimmed and silently truncates the real digits': 'E',
+  'E06: rapid double-click on Sign Up does not break the flow or leave a broken UI state': 'E',
+  'E08: browser refresh while the Signup modal is open does not leave a broken state': 'E',
+  'E10: pasting a value longer than maxlength into Aadhaar Number is still truncated': 'E',
+  'E11: repeatedly toggling between Sign Up and Sign In does not stack modals or leak data': 'E',
+  'P08: sign in succeeds immediately after a fresh sign-up, using the same credentials': 'P',
+  'E09: concurrent sign-up attempts with the same Aadhaar Number only let one succeed': 'E',
+  // Candidate Sign-In
+  'TC-012: rejects sign-in with an incorrect password': 'N',
+  'TC-013: rejects sign-in with an unregistered Aadhaar number': 'N',
+  'TC-014: safely rejects script/SQL-injection style input without executing it': 'N',
+  'TC-N11: blocks sign-in when the acknowledgement checkbox is left unchecked': 'N',
+  'E07: rapid double-click on Sign In does not cause a duplicate session or error': 'E',
+  'Forgot Password: registered Aadhaar number receives a reset-link confirmation': 'P',
+  'Forgot Password: unregistered Aadhaar number is told details are not available': 'N',
+  'Forgot Password: blank Aadhaar number is rejected by field validation': 'N',
+  // Phase 1 - Personal Details / Qualification / Experience
+  'TC-015: blocks Next when mandatory fields are left blank': 'N',
+  'TC-016: rejects a malformed PAN number': 'N',
+  'TC-017: rejects a mobile number with the wrong digit count': 'E',
+  'TC-019: rejects a future "past interview date"': 'N',
+  'TC-018: rejects an invalid PIN code': 'E',
+  'TC-020: rejects a malformed vehicle number': 'N',
+  'TC-021: browser refresh mid-form does not leave a broken/duplicated state': 'E',
+  'E01: PAN validation message appears immediately on blur, without clicking Next': 'E',
+  'TC-022: rejects a 10th "To Date" earlier than its "From Date"': 'N',
+  'TC-023: rejects a marks percentage outside 0-100': 'E',
+  'TC-024: allows adding more than one additional qualification': 'P',
+  'TC-025: rejects an experience "To Date" earlier than its "From Date"': 'N',
+  'TC-026: "Currently working here" checked together with an explicit To Date': 'E',
+  'TC-027: switching Experienced -> Not Experienced after partial entry leaves no stale state': 'E',
+  // Phase 2 - Document Upload
+  'TC-030: blocks Submit when a mandatory document is missing': 'N',
+  'TC-028: rejects an unsupported file type on upload': 'N',
+  'TC-031: rejects a malformed UAN number': 'N',
+  'TC-029: rejects an oversized file on upload': 'E',
+  'TC-032: replacing an already-uploaded document keeps only the new file': 'P',
+  // Manager Referral - titles use the workbook's own bare Testcase_id
+  // (TC_01, TC_02...) with no category embedded in the title text at all
+  // (per explicit request, to avoid a redundant "[Positive]"/"[Negative]"
+  // label sitting right next to the already-color-coded P-01/N-01/E-01
+  // badge) - every one of its 68 tests is therefore keyed here instead.
+  // Page.spec.js and Report.spec.js each restart their own TC_01 numbering
+  // (matching the workbook's two separate sheets), so entries are keyed by
+  // the full title text, not the bare id, to avoid collisions between them.
+  'TC_01: accepts an alphabetically valid Candidate Name': 'P',
+  "TC_02: a numeric Candidate Name is currently accepted (known gap vs. the workbook's original expectation)": 'N',
+  'TC_03: rejects a Candidate Name containing special characters': 'N',
+  'TC_04: rejects an empty Candidate Name on submission': 'N',
+  'TC_05: a Candidate Name with leading/trailing spaces is accepted untrimmed': 'N',
+  'TC_06: Candidate Name field enforces its 200-character maximum length': 'E',
+  'TC_07: a single-character Candidate Name is accepted': 'E',
+  'TC_08: a Candidate Name with multiple consecutive internal spaces is accepted': 'N',
+  'TC_09: rejects a Candidate Name made up of only spaces': 'N',
+  'TC_10: rejects a Candidate Name with unicode/non-English characters': 'N',
+  'TC_11: rejects a Candidate Name containing hidden/non-printable characters': 'N',
+  'TC_12: a script-tag payload in Candidate Name is inert (never executes), and a SQL-injection-style payload is rejected': 'N',
+  'TC_13: accepts a valid 10-digit Mobile Number': 'P',
+  'TC_14: rejects a Mobile Number with fewer than 10 digits': 'N',
+  'TC_15: Mobile Number field cannot hold more than 10 digits': 'E',
+  'TC_16: rejects a Mobile Number containing alphabetic characters': 'N',
+  'TC_17: rejects a Mobile Number containing special characters': 'N',
+  'TC_18: rejects a Mobile Number with a country code prefix': 'N',
+  "TC_19: a Mobile Number with a leading 0-5 is currently accepted (known gap vs. the workbook's original expectation)": 'E',
+  "TC_20: an all-identical-digit Mobile Number is currently accepted (known gap vs. the workbook's original expectation)": 'E',
+  'TC_21: rejects a Mobile Number with embedded spaces/dashes': 'N',
+  'TC_22: blocks submission with a modal when both Mobile Number and Email ID are left blank': 'N',
+  'TC_23: rejects a Mobile Number using non-ASCII digit characters': 'N',
+  'TC_24: a script-tag payload in Mobile Number is inert (never executes), and a SQL-injection-style payload is rejected': 'N',
+  'TC_25: accepts a valid Email ID': 'P',
+  'TC_26: rejects an Email ID missing the @ symbol': 'N',
+  'TC_27: rejects an Email ID missing a domain/TLD': 'N',
+  'TC_28: rejects an Email ID with multiple @ symbols': 'N',
+  'TC_29: rejects an Email ID with embedded spaces': 'N',
+  'TC_30: rejects an Email ID with leading/trailing spaces': 'N',
+  'TC_31: blocks submission with a modal when both Email ID and Mobile Number are left blank': 'N',
+  'TC_32: Email ID field enforces its 200-character maximum length': 'E',
+  'TC_33: a script-tag payload in Email ID is inert (never executes), and a SQL-injection-style payload is rejected': 'N',
+  "TC_34: an @mankindpharma.com Email ID is currently accepted here (differs from Candidate Signup's own domain block)": 'N',
+  'TC_35: an uppercase @MANKINDPHARMA.COM Email ID is also accepted (case-insensitive gap)': 'N',
+  'TC_36: an Email ID on a mankindpharma.com subdomain is accepted': 'E',
+  'TC_41: a Reference ID that exists in the database completes a real referral submission': 'P',
+  'TC_42: rejects a valid-shape 8-digit Reference ID that is not a real SAP ID': 'N',
+  'TC_43: rejects a Reference ID with fewer than 8 digits': 'E',
+  'TC_44: a Reference ID typed with more than 8 digits is truncated, then rejected as an unknown SAP ID': 'E',
+  'TC_45: rejects a Reference ID containing alphabetic characters': 'N',
+  'TC_46: rejects a Reference ID containing special characters': 'N',
+  'TC_47: rejects a Reference ID with embedded spaces': 'N',
+  'TC_48: rejects a valid-format Reference ID with a leading zero that is not a real SAP ID': 'E',
+  'TC_49: rejects an empty Reference ID on submission': 'N',
+  'TC_50: a script-tag payload in Reference ID is inert (never executes), and a SQL-injection-style payload is rejected': 'N',
+  'TC_37: accepts submission when only one of Mobile Number or Email ID is provided': 'P',
+  'TC_38: accepts submission when both Mobile Number and Email ID are provided': 'P',
+  'TC_39: Submit completes a real referral with every field filled': 'P',
+  'TC_40: Reset clears every field after confirming the prompt': 'P',
+  'TC_51: every UI component on the Manager Referral page is present': 'P',
+  'TC_01: every UI component on the Manager Referral Report page is present': 'P',
+  'TC_02: Get Records displays matching records for a valid, DB-known SAP ID': 'P',
+  'TC_03: Get Records shows "No Record Found!" for a valid-format SAP ID not in the database': 'N',
+  'TC_04: Get Records rejects a Reference ID with fewer than 8 digits': 'E',
+  'TC_05: Get Records rejects a Reference ID with more than 8 digits': 'E',
+  'TC_06: Get Records rejects alphabetic characters': 'N',
+  'TC_07: Get Records rejects special characters': 'N',
+  'TC_08: Get Records on an empty submission shows no records': 'N',
+  'TC_09: safely rejects script/SQL-injection style input in the Report search': 'N',
+  'TC_10: the Referral date column filter narrows and restores the grid': 'P',
+  'TC_11: the iTAP Number column filter narrows and restores the grid': 'P',
+  'TC_12: the Candidate name column filter narrows and restores the grid': 'P',
+  'TC_13: the Email ID column filter narrows and restores the grid': 'P',
+  'TC_14: the Mobile number column filter narrows and restores the grid': 'P',
+  'TC_15: the Aadhaar number column filter narrows and restores the grid': 'P',
+  'TC_16: the Initial feedback column filter works correctly': 'P',
+  'TC_17: pagination controls navigate and enable/disable correctly': 'P',
+};
+
+function classifyTest(title) {
+  if (MANUAL_TEST_CATEGORY[title]) return MANUAL_TEST_CATEGORY[title];
+  // Legacy pattern from the original (now replaced) Manager Referral suite,
+  // whose IDs spelled the category out directly (TC_MR_P06, TC_MR_N08,
+  // TC_MR_E07...). The rebuilt suite's titles are covered by
+  // MANUAL_TEST_CATEGORY above instead; kept here only in case any old
+  // recorded run history still has titles in that shape.
+  const m = title.match(/TC_MR_([PNE])\d/);
+  if (m) return m[1];
+  // FC Admin Interview module tests embed their category directly in the
+  // title, e.g. "INT-75 [Positive]: ...", "TC-036 [Negative]: ...".
+  const bracket = title.match(/\[(Positive|Negative|Edge)\]/);
+  if (bracket) return bracket[1][0]; // 'P' | 'N' | 'E'
+  return 'P'; // default: happy-path / functional steps with no explicit category
+}
+
+const CATEGORY_LABEL = { P: 'Positive', N: 'Negative', E: 'Edge' };
+const CATEGORY_COLOR = { P: '#1a7f4b', N: '#c0392b', E: '#b9790a' };
+
+// Hand-written, verified-against-test-code descriptions for the Sign In/Up
+// and Phase 1 & 2 suites (same title keys as MANUAL_TEST_CATEGORY above) —
+// these are the tests visible on the dashboard's first screen, so they get
+// full "Verify that ..." sentences instead of the generic auto-formatted
+// fallback used for every other project below.
+const MANUAL_TEST_DESCRIPTION = {
+  'TC-001/002: rejects a non-numeric or short Aadhaar number': 'Verify that a non-numeric or too-short Aadhaar number is rejected during signup.',
+  'TC-003: rejects signup with an already-registered Aadhaar number': 'Verify that signup is rejected when the Aadhaar number is already registered.',
+  'TC-004: rejects an invalid / official Mankind email address': 'Verify that an invalid or official Mankind email address is rejected during signup.',
+  'TC-005: rejects mismatched New Password / Confirm Password': "Verify that signup is rejected when New Password and Confirm Password don't match.",
+  'TC-006: shows the password policy tooltip and enforces it': 'Verify that the password policy tooltip is shown and its rules are enforced.',
+  'TC-007: rejects an invalid Manager Reference ID': 'Verify that an invalid Manager Reference ID is rejected during signup.',
+  'TC-008: blocks submission when the acknowledgement checkbox is unchecked': 'Verify that signup submission is blocked when the acknowledgement checkbox is left unchecked.',
+  'TC-009: shows per-field validation on a fully blank form submit': 'Verify that per-field validation messages appear when the signup form is submitted completely blank.',
+  'TC-010: toggles between Sign Up and Sign In modals': 'Verify that the Sign Up and Sign In modals can be toggled between correctly.',
+  'TC-011: closing the Signup modal mid-entry and reopening it clears the form': 'Verify that closing the Signup modal mid-entry and reopening it clears all previously entered data.',
+  'E01: Aadhaar Number field enforces the 12-digit maximum length on both forms': "Verify that the Aadhaar Number field enforces its 12-digit maximum length on both the Sign Up and Sign In forms.",
+  'E02: Manager Reference ID field enforces the 8-character maximum length': 'Verify that the Manager Reference ID field enforces its 8-character maximum length.',
+  'E03: Email field accepts up to its 200-character maximum length': 'Verify that the Email field accepts input up to its 200-character maximum length.',
+  'E04: Password / Confirm Password fields enforce their 50-character maximum': 'Verify that the Password and Confirm Password fields enforce their 50-character maximum length.',
+  'E05: leading whitespace in Aadhaar Number is not trimmed and silently truncates the real digits': "Verify how leading whitespace in Aadhaar Number is handled — it isn't trimmed and silently truncates the real digits.",
+  'E06: rapid double-click on Sign Up does not break the flow or leave a broken UI state': "Verify that rapidly double-clicking Sign Up doesn't break the flow or leave the UI in a broken state.",
+  'E08: browser refresh while the Signup modal is open does not leave a broken state': "Verify that refreshing the browser while the Signup modal is open doesn't leave the page in a broken state.",
+  'E10: pasting a value longer than maxlength into Aadhaar Number is still truncated': "Verify that pasting a value longer than the field's maxlength into Aadhaar Number is still truncated correctly.",
+  'E11: repeatedly toggling between Sign Up and Sign In does not stack modals or leak data': "Verify that repeatedly toggling between Sign Up and Sign In doesn't stack modals or leak data between them.",
+  'P08: sign in succeeds immediately after a fresh sign-up, using the same credentials': 'Verify that signing in immediately after a fresh sign-up succeeds using the same credentials.',
+  'E09: concurrent sign-up attempts with the same Aadhaar Number only let one succeed': 'Verify that concurrent sign-up attempts using the same Aadhaar Number only let one of them succeed.',
+  'TC-012: rejects sign-in with an incorrect password': 'Verify that sign-in is rejected when an incorrect password is entered.',
+  'TC-013: rejects sign-in with an unregistered Aadhaar number': 'Verify that sign-in is rejected when an unregistered Aadhaar number is entered.',
+  'TC-014: safely rejects script/SQL-injection style input without executing it': 'Verify that script- or SQL-injection style input is safely rejected without being executed.',
+  'TC-N11: blocks sign-in when the acknowledgement checkbox is left unchecked': 'Verify that sign-in is blocked when the acknowledgement checkbox is left unchecked.',
+  'E07: rapid double-click on Sign In does not cause a duplicate session or error': "Verify that rapidly double-clicking Sign In doesn't cause a duplicate session or an error.",
+  'Forgot Password: registered Aadhaar number receives a reset-link confirmation': 'Verify that entering a registered Aadhaar number in Forgot Password shows a reset-link confirmation.',
+  'Forgot Password: unregistered Aadhaar number is told details are not available': "Verify that entering an unregistered Aadhaar number in Forgot Password reports that details aren't available.",
+  'Forgot Password: blank Aadhaar number is rejected by field validation': 'Verify that submitting Forgot Password with a blank Aadhaar number is rejected by field validation.',
+  'TC-015: blocks Next when mandatory fields are left blank': 'Verify that clicking Next is blocked when mandatory Phase 1 fields are left blank.',
+  'TC-016: rejects a malformed PAN number': 'Verify that a malformed PAN number is rejected.',
+  'TC-017: rejects a mobile number with the wrong digit count': 'Verify that a mobile number with an incorrect digit count is rejected.',
+  'TC-019: rejects a future "past interview date"': "Verify that a future date entered as the 'past interview date' is rejected.",
+  'TC-018: rejects an invalid PIN code': 'Verify that an invalid PIN code is rejected.',
+  'TC-020: rejects a malformed vehicle number': 'Verify that a malformed vehicle number is rejected.',
+  'TC-021: browser refresh mid-form does not leave a broken/duplicated state': "Verify that refreshing the browser mid-form doesn't leave Phase 1 in a broken or duplicated state.",
+  'E01: PAN validation message appears immediately on blur, without clicking Next': 'Verify that the PAN validation message appears immediately on field blur, without needing to click Next.',
+  'TC-022: rejects a 10th "To Date" earlier than its "From Date"': "Verify that a 10th-standard 'To Date' earlier than its 'From Date' is rejected.",
+  'TC-023: rejects a marks percentage outside 0-100': 'Verify that a marks percentage outside the 0-100 range is rejected.',
+  'TC-024: allows adding more than one additional qualification': 'Verify that more than one additional qualification can be added.',
+  'TC-025: rejects an experience "To Date" earlier than its "From Date"': "Verify that an experience 'To Date' earlier than its 'From Date' is rejected.",
+  'TC-026: "Currently working here" checked together with an explicit To Date': "Verify the behavior when 'Currently working here' is checked together with an explicit To Date.",
+  'TC-027: switching Experienced -> Not Experienced after partial entry leaves no stale state': 'Verify that switching from Experienced to Not Experienced after partial entry leaves no stale data behind.',
+  'TC-030: blocks Submit when a mandatory document is missing': 'Verify that Submit is blocked when a mandatory document upload is missing.',
+  'TC-028: rejects an unsupported file type on upload': 'Verify that an unsupported file type is rejected on document upload.',
+  'TC-031: rejects a malformed UAN number': 'Verify that a malformed UAN number is rejected.',
+  'TC-029: rejects an oversized file on upload': 'Verify that an oversized file is rejected on document upload.',
+  'TC-032: replacing an already-uploaded document keeps only the new file': 'Verify that replacing an already-uploaded document keeps only the newly uploaded file.',
+};
+
+// Every other project (Manager Referral, FC Admin Interview, FC Admin
+// Onboarding) has no hand-written entry above — rather than duplicate the
+// raw test name into this column, fall back to the same descriptive tail
+// splitTitle() already extracts (used for the muted subtitle previously),
+// reformatted into a standalone sentence. Safe for both fragment shapes
+// test titles use here ("rejects X" and "closing X clears Y") since it
+// never prepends a subject that could clash with the fragment's own grammar.
+function buildDescription(title) {
+  if (MANUAL_TEST_DESCRIPTION[title]) return MANUAL_TEST_DESCRIPTION[title];
+  const { id, desc } = splitTitle(title);
+  const base = desc || id;
+  const sentence = base.charAt(0).toUpperCase() + base.slice(1);
+  return /[.!?]$/.test(sentence) ? sentence : sentence + '.';
+}
+
+// A *stored history* run's raw results aren't filtered by dashboard project —
+// a report recorded before Candidate/ was split into per-cluster files (or
+// from an unscoped run) can still contain rows that don't belong to whichever
+// project is being viewed now. Re-filter at render time so old history never
+// bleeds across projects. Kept in sync with server.js's PROJECTS.signin/
+// phase1phase2 testFilter.
+function belongsToProject(projectId, r) {
+  if (projectId === 'signin') {
+    return r.file === 'Candidate/SignUpSignIn.spec.js';
+  }
+  if (projectId === 'phase1phase2') {
+    return r.file === 'Candidate/Phase1.spec.js' || r.file === 'Candidate/Phase2.spec.js';
+  }
+  return true; // referral lives in its own separate directory — nothing to filter
+}
+function scopedResults(projectId, entry) {
+  return (entry.results || []).filter((r) => belongsToProject(projectId, r));
+}
+
+// A stored history entry predates this project's current file layout when it
+// has real results but none of them match belongsToProject() - scopedResults()
+// then returns an empty array, which used to render as an indistinguishable
+// "0 total / 0 pass / 0 fail / 0.0% pass rate" plus a false "✓ All tests
+// passed" banner. Confirmed live: every one of Sign In & Sign Up's 5 and
+// Phase 1 & Phase 2's 12 stored runs predate the 2026-09-02 Candidate/ file
+// reorg and hit exactly this case. Callers use this to show an honest
+// "legacy run" notice instead.
+function isLegacyUnmatched(projectId, entry) {
+  return (entry.results || []).length > 0 && scopedResults(projectId, entry).length === 0;
+}
+function computeTotals(results) {
+  return results.reduce((acc, r) => {
+    acc.total += 1;
+    if (r.status === 'passed') acc.passed += 1;
+    else if (r.status === 'failed' || r.status === 'timedOut') acc.failed += 1;
+    else if (r.status === 'stopped') acc.stopped += 1;
+    else acc.skipped += 1;
+    return acc;
+  }, { total: 0, passed: 0, failed: 0, skipped: 0, stopped: 0 });
+}
+
+// Assigns each result its own sequential "P-01 / N-01 / E-01..." identity,
+// numbered within the currently displayed report (not tied to whatever ad
+// hoc numbering already exists inside a handful of test IDs like "E09").
+function assignCategoryIds(results) {
+  const counters = { P: 0, N: 0, E: 0 };
+  return results.map((r) => {
+    const cat = classifyTest(r.title);
+    counters[cat] += 1;
+    return { ...r, category: cat, categoryId: `${cat}-${String(counters[cat]).padStart(2, '0')}` };
+  });
+}
+
+function categoryBadge(categoryId, category) {
+  const color = CATEGORY_COLOR[category];
+  return `<span class="badge" style="background:${color}1a; color:${color};" title="${CATEGORY_LABEL[category]} case">${categoryId}</span>`;
+}
+
+// A project's results can come from more than one spec file (e.g. Manager
+// Referral's Page.spec.js TC_01-51 plus Report.spec.js TC_01-18) - each
+// file's own TC_XX is copied straight from that file's own Excel sheet
+// (ManagerReferralPage_TestCases vs ManagerReferralReport_TestCases both
+// have their own independent TC_01), so the combined list restarts partway
+// through instead of reading as one continuous run. Only renumber when that
+// actually produces a duplicate id in the currently displayed list -
+// projects backed by a single file (or already-unique ids) render exactly
+// as before, so this can't change anything for the other project tabs.
+function assignDisplayIds(results) {
+  const sourceIds = results.map((r) => splitTitle(r.title).id);
+  const hasDuplicates = new Set(sourceIds).size !== sourceIds.length;
+  if (!hasDuplicates) {
+    return results.map((r, i) => ({ ...r, displayId: sourceIds[i] }));
+  }
+  const width = Math.max(2, String(results.length).length);
+  return results.map((r, i) => ({ ...r, displayId: `TC_${String(i + 1).padStart(width, '0')}` }));
+}
+
+// Playwright's raw error text (assertion diffs, locator retry logs, stack
+// traces) is unreadable for a non-programmer. These patterns cover
+// environment/flow failures that have no "Expected/Received" values to
+// report on — an actual assertion mismatch is instead handled below by
+// parseAssertionDetails(), which reads the real expected/received values
+// out of the raw error so the message is specific to *this* failure
+// instead of a generic catch-all.
+const FRIENDLY_REASON_PATTERNS = [
+  [/\[APP_OFFLINE\]/,
+    'The application itself is offline right now — it showed its own "This app is not running" outage page instead of loading normally. This is an environment/hosting issue, not a defect in this test. Wait for the app to come back online and re-run.'],
+  [/\[APP_SERVER_ERROR\]/,
+    'The application\'s own backend reported a server error while processing this step (its generic "please contact your system administrator" message). This is an app/environment issue, not a gap in this test\'s own validation — try again once the environment is stable.'],
+  [/Executable doesn't exist at/i,
+    "The browser needed to run this test isn't installed on this machine. Run \"npx playwright install\" and try again."],
+  [/Timed out|Test timeout of \d+ms exceeded|timeout \d+ms exceeded/i,
+    'This step took too long to finish. That usually means the website (or the network) was briefly slow — try running it again.'],
+  [/Target page, context or browser has been closed/i,
+    'The browser closed unexpectedly in the middle of this step, usually because of a brief slowdown. Try running it again.'],
+  [/element is not enabled|not enabled/i,
+    "A field on the page wasn't ready to be filled in yet. This is usually a temporary loading hiccup — try running it again."],
+  [/strict mode violation/i,
+    'The page showed more than one matching item where only one was expected. This usually points to a real change on the page worth reviewing.'],
+  [/net::ERR_|ECONNREFUSED|ENOTFOUND/i,
+    'The website could not be reached. Check that it is online and try again.'],
+];
+
+// Playwright prints the concrete expected/received values on their own
+// "Expected...:" / "Received...:" lines after the first line, regardless of
+// which matcher was used (toContain, toBeVisible, toHaveValue, toBe, ...).
+// Reading those directly means the message reflects what this specific run
+// actually saw, instead of a generic "didn't behave as expected".
+function parseAssertionDetails(raw) {
+  const firstLine = raw.split('\n')[0];
+  const matcherMatch = firstLine.match(/expect\((?:received|locator|value)\)\.(not\.)?([A-Za-z]+)\(/);
+  if (!matcherMatch) return null;
+  const negated = !!matcherMatch[1];
+  const matcher = matcherMatch[2];
+
+  const expectedMatch = raw.match(/^Expected[^:\n]*:\s*(.+)$/m);
+  const receivedMatch = raw.match(/^Received[^:\n]*:\s*(.+)$/m);
+  if (!expectedMatch && !receivedMatch) return null;
+
+  let expected = expectedMatch ? expectedMatch[1].trim() : null;
+  const received = receivedMatch ? receivedMatch[1].trim() : null;
+  // Negated matchers print the expected line as `not "X"` — strip the
+  // leading "not " since the phrase templates below add their own negation.
+  if (expected && negated) expected = expected.replace(/^not\s+/, '');
+
+  return { negated, matcher, expected, received };
+}
+
+const COMPARATOR_MATCHERS = new Set([
+  'toBeGreaterThan', 'toBeGreaterThanOrEqual', 'toBeLessThan', 'toBeLessThanOrEqual',
+]);
+
+const MATCHER_PHRASES = {
+  toContain(expected, received, negated) {
+    if (negated) return `Expected the message ${expected} NOT to appear, but it did.`;
+    const nothingShown = received === '[]' || received === '';
+    return nothingShown
+      ? `Expected the message ${expected} to appear, but no validation message was shown at all.`
+      : `Expected the message ${expected} to appear, but instead saw: ${received}.`;
+  },
+  toContainText(expected, received, negated) {
+    return MATCHER_PHRASES.toContain(expected, received, negated);
+  },
+  toHaveValue(expected, received, negated) {
+    return negated
+      ? `Expected the field NOT to contain ${expected}, but it did.`
+      : `Expected the field to contain ${expected}, but it actually contained ${received}.`;
+  },
+  toBeVisible(expected, received, negated) {
+    if (negated) return 'Expected the element to be hidden, but it was still visible.';
+    return `Expected the element to be visible, but it was ${received && /hidden/i.test(received) ? 'hidden' : 'not found on the page'}.`;
+  },
+  toHaveCount(expected, received) {
+    return `Expected ${expected} matching item(s), but found ${received}.`;
+  },
+  toBeDisabled() {
+    return 'Expected the field to be disabled, but it was enabled.';
+  },
+  toBeEnabled() {
+    return 'Expected the field to be enabled, but it was disabled.';
+  },
+  toHaveTitle(expected, received, negated) {
+    return negated
+      ? `Expected the page title NOT to be ${expected}, but it was.`
+      : `Expected the page title to be ${expected}, but it was ${received}.`;
+  },
+  toMatch(expected, received, negated) {
+    return negated
+      ? `Expected the text NOT to match ${expected}, but got ${received}.`
+      : `Expected the text to match ${expected}, but got ${received}.`;
+  },
+  toHaveAttribute(expected, received, negated) {
+    return negated
+      ? `Expected the attribute NOT to be ${expected}, but it was.`
+      : `Expected the attribute to be ${expected}, but it was ${received}.`;
+  },
+  toBeNull(expected, received, negated) {
+    return negated ? `Expected a non-null value, but got ${received}.` : `Expected null, but got ${received}.`;
+  },
+  toBeTruthy(expected, received) {
+    return `Expected a truthy value, but got ${received}.`;
+  },
+};
+
+// server.js prepends this tag (see finalizeRun's "environment-issue" attachment
+// handling) whenever BrowserFactory observed a real HTTP 5xx or failed request
+// against the app during this test - a high-confidence signal the failure is
+// the environment's fault, not this test's own check. Generic by design: it
+// renders whatever specific issue text was captured instead of matching
+// against a fixed list of known error strings, so a *new* kind of environment
+// failure (one nobody has hardcoded a pattern for yet) still gets described
+// accurately here rather than falling through to a generic "didn't behave as
+// expected".
+const ENV_ISSUE_PATTERN = /^\[ENV_ISSUE\]\s*(.+?)\s*(?:\n|$)/;
+
+function friendlyReason(rawReason) {
+  if (!rawReason) return null;
+  const envMatch = rawReason.match(ENV_ISSUE_PATTERN);
+  if (envMatch) {
+    return `This looks like an environment/app issue, not a defect in this check: ${envMatch[1]} — try again once the environment is stable.`;
+  }
+  for (const [pattern, message] of FRIENDLY_REASON_PATTERNS) {
+    if (pattern.test(rawReason)) return message;
+  }
+
+  const details = parseAssertionDetails(rawReason);
+  if (details) {
+    const { matcher, expected, received, negated } = details;
+    if (COMPARATOR_MATCHERS.has(matcher) && expected) {
+      return `Expected a value ${expected}, but got ${received}.`;
+    }
+    const phraseFn = MATCHER_PHRASES[matcher];
+    if (phraseFn && (expected || received)) {
+      return phraseFn(expected, received, negated);
+    }
+    if (expected && received) {
+      return `Expected ${expected}, but got ${received}.`;
+    }
+    if (expected) return `Expected ${expected}.`;
+  }
+  return 'This step did not behave as expected.';
+}
+
+// Uses a plain toggle link + hidden div (not <details>/<summary>) — the
+// native disclosure widget renders with a zero-size layout box in some
+// browsers when placed inside a table cell, making it unclickable.
+//
+// Passed tests show a plain "—" here since there's nothing to explain,
+// while failed/skipped tests keep the friendly explanation plus the raw
+// technical details toggle.
+function reasonCell(r) {
+  if (r.status === 'passed' || !r.reason) return '<span class="muted">—</span>';
+  // Skipped tests already carry a human-written explanation from their own test.skip(...)
+  // call (e.g. "Set referenceIdZeroRecords in config.js..."), not a raw Playwright error —
+  // running it through friendlyReason() (built only to translate FAILURE stack traces/error
+  // shapes) matched none of its patterns and fell back to "This step did not behave as
+  // expected", which is actively wrong for a deliberate, documented skip. Show the real
+  // skip message as-is instead; only failed/timedOut reasons need the raw-vs-friendly split.
+  if (r.status === 'skipped') {
+    return `<div class="skip-text">${escapeHtml(r.reason)}</div>`;
+  }
+  const friendly = friendlyReason(r.reason);
+  const cls = (r.status === 'failed' || r.status === 'timedOut') ? 'error-text' : 'skip-text';
+  return `
+    <div class="${cls}">${escapeHtml(friendly)}</div>
+    <a href="#" class="muted tech-details-toggle" style="cursor:pointer; font-size:0.85em; text-decoration:underline; display:inline-block; margin-top:4px;" onclick="const d=this.nextElementSibling; d.style.display = d.style.display === 'none' ? 'block' : 'none'; return false;">Technical details</a>
+    <div class="muted" style="display:none; font-family:Consolas, monospace; font-size:0.82em; margin-top:4px; white-space:pre-wrap;">${escapeHtml(r.reason)}</div>`;
+}
+
+async function init() {
+  const data = await (await fetch('/api/projects')).json();
+  projects = data.projects;
+  for (const p of projects) {
+    await loadHistory(p.id); // populates historyCache + projectHealth
+  }
+  renderSidebar();
+  selectProject(projects[0].id);
+  refreshResumeAvailability();
+}
+
+async function refreshResumeAvailability() {
+  try {
+    const data = await (await fetch('/api/resume-info')).json();
+    resumable = !!(data.ok && data.resumable);
+  } catch (e) {
+    resumable = false;
+  }
+  updateActionButtons();
+}
+
+resumeBtn.addEventListener('click', async () => {
+  if (startingRun) return; // already submitting a previous click - ignore a rapid re-click
+  startingRun = true;
+  updateActionButtons();
+  try {
+    const response = await fetch('/api/resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ headless: wantHeadless }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Could not resume.');
+    resumable = false; // consumed server-side; refreshed again once the run completes
+  } catch (error) {
+    alert(`Failed to resume: ${error.message}`);
+  } finally {
+    startingRun = false;
+    updateActionButtons();
+  }
+});
+
+function healthOf(id) {
+  if (runState.running && runState.project === id) return 'running';
+  return (projectHealth[id] && projectHealth[id].status) || 'none';
+}
+
+function renderSidebar() {
+  projectNav.innerHTML = '';
+  for (const p of projects) {
+    const item = document.createElement('button');
+    item.className = 'nav-item' + (p.id === currentProjectId ? ' active' : '');
+    item.innerHTML = `<span>${p.label}</span><span class="dot ${healthOf(p.id)}"></span>`;
+    item.addEventListener('click', () => selectProject(p.id));
+    projectNav.appendChild(item);
+  }
+}
+
+// Bumped on every selectProject() call so a slow/late-resolving loadTests()
+// from a project the user already navigated away from can detect it's stale
+// and drop its own result instead of overwriting the checklist with the
+// wrong project's tests (loadTests() calls aren't guaranteed to resolve in
+// the order they were fired - confirmed live when switching projects
+// quickly right after page load, while /api/tests responses are still
+// uncached and their latencies vary by project size).
+let selectRequestSeq = 0;
+
+async function selectProject(id) {
+  currentProjectId = id;
+  const mySeq = ++selectRequestSeq;
+  const p = projects.find((x) => x.id === id);
+  renderSidebar();
+  reportLink.href = `/report/${id}`;
+  projMeta.textContent = p.description;
+
+  updateCrossRunBanner();
+  updateActionButtons();
+
+  projTitle.textContent = p.label;
+  if (runState.running && runState.project === id) {
+    livePanel.style.display = '';
+    updateLivePanelText();
+  } else {
+    livePanel.style.display = 'none';
+  }
+
+  const health = projectHealth[id];
+  if (health && health.lastRun) {
+    displayedReport = health.lastRun;
+    renderReport(displayedReport, `Run ${displayedReport.runId}`);
+  } else {
+    displayedReport = null;
+    resultsCard.style.display = 'none';
+    failuresCard.style.display = 'none';
+    allPassStrip.style.display = 'none';
+    statStrip.innerHTML = '';
+    // Clear stale rows left over from whichever project was displayed
+    // before this one — hiding the cards alone isn't enough, since their
+    // tbody content stays in the DOM (and stays clickable) otherwise.
+    resultsBody.innerHTML = '';
+    failuresBody.innerHTML = '';
+  }
+  renderHistory(id);
+
+  checklist.innerHTML = '<div class="muted" style="padding:10px;">Loading tests…</div>';
+  const tests = await loadTests(id);
+  if (mySeq !== selectRequestSeq) return; // a newer selectProject() call started while this one was in flight - drop it
+  currentTests = tests;
+  selectedKeys = new Set();
+  renderChecklist();
+}
+
+function updateCrossRunBanner() {
+  if (runState.running && runState.project !== currentProjectId) {
+    const p = projects.find((x) => x.id === runState.project);
+    const nowTitle = runState.runningKey ? titleForKey(runState.runningKey) : '…';
+    crossRunBanner.innerHTML = `<div class="banner">⏱ ${p ? p.label : runState.project} is currently running (${runState.done}/${runState.testCount} — ${nowTitle}). Switching projects won't interrupt it.</div>`;
+  } else {
+    crossRunBanner.innerHTML = '';
+  }
+}
+
+let fullSuiteActive = false;
+let resumable = false;
+// True from the instant Run All/Run Everything/Resume is clicked until the
+// server responds - the server doesn't broadcast 'run-start' (which is what
+// flips runState.running) until AFTER it finishes listing that project's
+// tests, which the server's own code notes takes "several seconds". Without
+// this, busy stayed false for that whole window with nothing visibly
+// disabled, so an impatient double-click (or clicking a different run
+// button while the first request was still in flight) could fire a second
+// POST before the first one's run-start ever arrived. The server now has
+// its own lock for this (runReservation in server.js) so it can't corrupt
+// state either way, but disabling here too means a double-click never even
+// reaches the network layer.
+let startingRun = false;
+
+function updateActionButtons() {
+  const busy = runState.running || fullSuiteActive || startingRun;
+  runAllBtn.disabled = busy;
+  toggleOptionsBtn.disabled = busy;
+  stopBtn.disabled = !(runState.running || fullSuiteActive);
+  runFullSuiteBtn.disabled = busy;
+  resumeBtn.disabled = busy;
+  resumeBtn.style.display = resumable ? '' : 'none';
+  modeToggle.querySelectorAll('.mode-toggle-btn').forEach((b) => { b.disabled = busy; });
+  if (busy && runState.project === currentProjectId) {
+    runAllBtn.textContent = '▶ Run All';
+  }
+}
+
+async function loadTests(projectId, forceRefresh) {
+  const url = `/api/tests?project=${projectId}${forceRefresh ? '&refresh=true' : ''}`;
+  const data = await (await fetch(url)).json();
+  return data.ok ? data.tests : [];
+}
+
+function renderChecklist() {
+  const byFile = new Map();
+  for (const t of currentTests) {
+    if (!byFile.has(t.file)) byFile.set(t.file, []);
+    byFile.get(t.file).push(t);
+  }
+  checklist.innerHTML = '';
+  for (const [file, tests] of byFile.entries()) {
+    const title = document.createElement('div');
+    title.className = 'checklist-group-title';
+    title.textContent = `${file} (${tests.length})`;
+    checklist.appendChild(title);
+    for (const t of tests) {
+      const row = document.createElement('label');
+      row.className = 'checklist-row';
+      const key = testKey(t.file, t.line);
+      row.innerHTML = `<input type="checkbox" data-key="${key}"> <span>${t.title}</span>`;
+      row.querySelector('input').addEventListener('change', (e) => {
+        e.target.checked ? selectedKeys.add(key) : selectedKeys.delete(key);
+        updateSelectedCount();
+      });
+      checklist.appendChild(row);
+    }
+  }
+  updateSelectedCount();
+}
+function updateSelectedCount() { selectedCountEl.textContent = selectedKeys.size ? `${selectedKeys.size} selected` : ''; }
+
+document.getElementById('selectAllBtn').addEventListener('click', () => {
+  checklist.querySelectorAll('input[type=checkbox]').forEach((cb) => { cb.checked = true; selectedKeys.add(cb.dataset.key); });
+  updateSelectedCount();
+});
+document.getElementById('clearAllBtn').addEventListener('click', () => {
+  checklist.querySelectorAll('input[type=checkbox]').forEach((cb) => { cb.checked = false; });
+  selectedKeys.clear();
+  updateSelectedCount();
+});
+document.querySelectorAll('input[name="runMode"]').forEach((radio) => {
+  radio.addEventListener('change', () => {
+    checklistWrap.style.display = document.querySelector('input[name="runMode"]:checked').value === 'specific' ? 'block' : 'none';
+  });
+});
+toggleOptionsBtn.addEventListener('click', () => {
+  runOptionsCard.style.display = runOptionsCard.style.display === 'none' ? 'block' : 'none';
+});
+
+document.getElementById('refreshTestsBtn').addEventListener('click', async (e) => {
+  e.target.textContent = 'Refreshing…';
+  currentTests = await loadTests(currentProjectId, true);
+  selectedKeys = new Set();
+  renderChecklist();
+  e.target.textContent = '↻ Refresh Test List';
+});
+
+function renderStatStrip(totals) {
+  const rate = totals.total ? ((totals.passed / totals.total) * 100).toFixed(1) : '0.0';
+  let tiles = `
+    <div class="stat"><div class="num">${totals.total}</div><div class="lbl">Total</div></div>
+    <div class="stat pass"><div class="num">${totals.passed}</div><div class="lbl">Passed</div></div>
+    <div class="stat fail"><div class="num">${totals.failed}</div><div class="lbl">Failed</div></div>`;
+  if (totals.skipped > 0) {
+    tiles += `<div class="stat"><div class="num" style="color:var(--muted);">${totals.skipped}</div><div class="lbl">Skipped</div></div>`;
+  }
+  if (totals.stopped > 0) {
+    tiles += `<div class="stat"><div class="num" style="color:var(--warn);">${totals.stopped}</div><div class="lbl">Stopped</div></div>`;
+  }
+  tiles += `<div class="stat"><div class="num">${rate}%</div><div class="lbl">Pass rate</div></div>`;
+  statStrip.style.gridTemplateColumns = `repeat(${3 + (totals.skipped > 0 ? 1 : 0) + (totals.stopped > 0 ? 1 : 0) + 1}, 1fr)`;
+  statStrip.innerHTML = tiles;
+}
+
+function passedCheck() { return '<span class="passed-check">✓ Passed</span>'; }
+
+function screenshotCell(r) {
+  if (r.status === 'passed') return passedCheck();
+  if (r.screenshot) return `<a class="link" href="${r.screenshot}" target="_blank">View</a>`;
+  return '<span class="muted">No screenshot</span>';
+}
+
+function renderReport(entry, label) {
+  if (isLegacyUnmatched(currentProjectId, entry)) {
+    statStrip.innerHTML = '';
+    allPassStrip.style.display = 'none';
+    failuresCard.style.display = 'none';
+    resultsCard.style.display = '';
+    resultsRunLabel.textContent = label;
+    resultsBody.innerHTML = `<tr><td colspan="8" class="empty-note">Run ${escapeHtml(entry.runId)} was recorded before this module's test files were reorganized, so its results can't be matched to today's tests. It isn't blank - it just predates the current file layout.</td></tr>`;
+    return;
+  }
+  const relevant = scopedResults(currentProjectId, entry);
+  const totals = computeTotals(relevant);
+  renderStatStrip(totals);
+  const categorized = assignDisplayIds(assignCategoryIds(relevant));
+
+  const failing = categorized.filter((r) => r.status === 'failed' || r.status === 'timedOut');
+  if (failing.length) {
+    allPassStrip.style.display = 'none';
+    failuresCard.style.display = '';
+    failuresSub.textContent = `${failing.length} of ${totals.total}`;
+    failuresBody.innerHTML = '';
+    categorized.forEach((r, i) => {
+      if (r.status !== 'failed' && r.status !== 'timedOut') return;
+      const tr = document.createElement('tr');
+      tr.className = 'row-fail';
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>
+          <div style="text-transform:uppercase;">${escapeHtml(r.displayId)}</div>
+          <div style="margin-top:4px;">${categoryBadge(r.categoryId, r.category)}</div>
+        </td>
+        <td>${escapeHtml(buildDescription(r.title))}</td>
+        <td>${reasonCell(r)}</td>
+        <td>${formatDuration(r.duration)}</td>
+        <td>${r.screenshot ? `<a class="link" href="${r.screenshot}" target="_blank">View screenshot</a>` : '<span class="muted">No screenshot</span>'}</td>`;
+      failuresBody.appendChild(tr);
+    });
+  } else {
+    failuresCard.style.display = 'none';
+    allPassStrip.style.display = 'flex';
+  }
+
+  resultsCard.style.display = '';
+  resultsRunLabel.textContent = label;
+  resultsBody.innerHTML = '';
+  categorized.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    if (r.status === 'failed' || r.status === 'timedOut') tr.className = 'row-fail';
+    else if (r.status === 'skipped') tr.className = 'row-skip';
+    tr.innerHTML = `
+      <td>${i + 1}</td>
+      <td>
+        <div style="text-transform:uppercase;">${escapeHtml(r.displayId)}</div>
+        <div style="margin-top:4px;">${categoryBadge(r.categoryId, r.category)}</div>
+      </td>
+      <td>${escapeHtml(buildDescription(r.title))}</td>
+      <td>${reasonCell(r)}</td>
+      <td>${formatDuration(r.duration)}</td>
+      <td><span class="badge ${r.status}">${statusLabel(r.status)}</span></td>
+      <td>${screenshotCell(r)}</td>`;
+    resultsBody.appendChild(tr);
+  });
+}
+
+// Builds a standalone, self-contained HTML file from the currently-displayed
+// report — same serial numbers / plain-English descriptions / friendly error
+// text as on screen — so it can be opened, printed, or shared without this
+// dashboard running.
+function buildDownloadableReportHtml(entry, projectLabel, projectId) {
+  const relevant = scopedResults(projectId, entry);
+  const totals = computeTotals(relevant);
+  const categorized = assignDisplayIds(assignCategoryIds(relevant));
+  const rows = categorized.map((r, i) => {
+    const statusColor = r.status === 'passed' ? '#1a7f4b' : (r.status === 'failed' || r.status === 'timedOut') ? '#c0392b' : '#64748b';
+    const reasonText = (r.status === 'passed' || !r.reason)
+      ? '—'
+      : escapeHtml(r.status === 'skipped' ? r.reason : friendlyReason(r.reason));
+    const catColor = CATEGORY_COLOR[r.category];
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>
+        <div style="text-transform:uppercase; font-weight:700;">${escapeHtml(r.displayId)}</div>
+        <div style="margin-top:4px;"><span style="background:${catColor}1a; color:${catColor}; border-radius:999px; padding:1px 8px; font-size:0.78em; font-weight:700;">${r.categoryId}</span></div>
+      </td>
+      <td>${escapeHtml(buildDescription(r.title))}</td>
+      <td>${reasonText}</td>
+      <td>${formatDuration(r.duration)}</td>
+      <td style="color:${statusColor};font-weight:700;">${statusLabel(r.status)}</td>
+    </tr>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test Report — ${escapeHtml(projectLabel)} — Run ${entry.runId}</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 30px; color: #1a2233; }
+  h1 { font-size: 1.3em; margin-bottom: 4px; }
+  .meta { color: #64748b; font-size: 0.9em; margin-bottom: 18px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid #e3e8f0; text-align: left; font-size: 0.9em; vertical-align: top; }
+  th { background: #f8fafc; text-transform: uppercase; font-size: 0.72em; letter-spacing: 0.03em; color: #64748b; }
+  .summary { display: flex; gap: 18px; margin-bottom: 18px; }
+  .summary div { background: #f8fafc; border: 1px solid #e3e8f0; border-radius: 8px; padding: 10px 16px; }
+</style></head>
+<body>
+  <h1>${escapeHtml(projectLabel)} — Test Report</h1>
+  <div class="meta">Run ${escapeHtml(entry.runId)} · Generated ${new Date().toLocaleString()}</div>
+  <div class="summary">
+    <div><strong>${totals.total}</strong> total</div>
+    <div><strong>${totals.passed}</strong> passed</div>
+    <div><strong>${totals.failed}</strong> failed</div>
+    <div><strong>${totals.skipped || 0}</strong> skipped</div>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>Test Case</th><th>Description</th><th>Reason</th><th>Duration</th><th>Status</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</body></html>`;
+}
+
+function downloadCurrentReport() {
+  if (!displayedReport) { alert('No report is currently displayed for this project.'); return; }
+  if (isLegacyUnmatched(currentProjectId, displayedReport)) {
+    alert('This run predates the current file layout and has no results to download for this project.');
+    return;
+  }
+  const project = projects.find((p) => p.id === currentProjectId);
+  const html = buildDownloadableReportHtml(displayedReport, project ? project.label : currentProjectId, currentProjectId);
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${currentProjectId}-report-${displayedReport.runId}.html`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+document.getElementById('downloadReportBtn').addEventListener('click', downloadCurrentReport);
+
+async function loadHistory(projectId) {
+  const data = await (await fetch(`/api/history?project=${projectId}`)).json();
+  const history = data.ok ? data.history : [];
+  historyCache[projectId] = history;
+  // Skip legacy/unmatched entries when picking the run that drives the
+  // sidebar health dot and the report shown by default - the most recent
+  // run chronologically isn't useful here if it can't be displayed.
+  const lastMatchable = history.find((entry) => !isLegacyUnmatched(projectId, entry)) || null;
+  const lastRunTotals = lastMatchable ? computeTotals(scopedResults(projectId, lastMatchable)) : null;
+  projectHealth[projectId] = {
+    status: lastMatchable ? (lastRunTotals.failed > 0 ? 'bad' : 'good') : 'none',
+    lastRun: lastMatchable,
+  };
+}
+
+function renderHistory(projectId) {
+  const history = historyCache[projectId] || [];
+  historyBody.innerHTML = '';
+  if (!history.length) {
+    historyBody.innerHTML = '<tr><td class="empty-note">No runs yet for this project.</td></tr>';
+    return;
+  }
+  for (const entry of history) {
+    const tr = document.createElement('tr');
+    tr.className = 'history-row' + (displayedReport && displayedReport.runId === entry.runId ? ' viewing' : '');
+    if (isLegacyUnmatched(projectId, entry)) {
+      tr.innerHTML = `
+        <td style="width:22%;">${timeAgo(entry.startedAt)}</td>
+        <td colspan="3" class="muted">Legacy run — predates this module's current file layout, can't be matched to today's tests</td>
+        <td style="text-align:right;"><a class="link" href="#">View →</a></td>`;
+    } else {
+      const totals = computeTotals(scopedResults(projectId, entry));
+      tr.innerHTML = `
+        <td style="width:22%;">${timeAgo(entry.startedAt)}</td>
+        <td style="width:16%;">${totals.total} tests</td>
+        <td style="width:20%;"><span class="badge passed">${totals.passed} pass</span></td>
+        <td style="width:20%;">${totals.failed ? `<span class="badge failed">${totals.failed} fail</span>` : '<span class="muted">0 fail</span>'}</td>
+        <td style="text-align:right;"><a class="link" href="#">View →</a></td>`;
+    }
+    tr.addEventListener('click', () => {
+      displayedReport = entry;
+      renderReport(entry, `Run ${entry.runId}`);
+      renderHistory(projectId);
+    });
+    historyBody.appendChild(tr);
+  }
+}
+
+// ---- Run actions -----------------------------------------------------------
+async function startRun(tests) {
+  if (startingRun) return; // already submitting a previous click - ignore a rapid re-click
+  startingRun = true;
+  updateActionButtons();
+  try {
+    const response = await fetch('/api/run-tests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project: currentProjectId, tests, headless: wantHeadless }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Run failed to start.');
+  } catch (error) {
+    alert(`Failed to start the run: ${error.message}`);
+    runState.running = false;
+  } finally {
+    startingRun = false;
+    updateActionButtons();
+  }
+}
+
+runAllBtn.addEventListener('click', () => {
+  const mode = document.querySelector('input[name="runMode"]:checked').value;
+  if (mode === 'specific') {
+    if (!selectedKeys.size) { alert('Select at least one test, or switch back to "Run All Tests".'); return; }
+    const tests = currentTests.filter((t) => selectedKeys.has(testKey(t.file, t.line))).map((t) => ({ file: t.file, line: t.line }));
+    startRun(tests);
+  } else {
+    startRun([]);
+  }
+});
+
+runFullSuiteBtn.addEventListener('click', async () => {
+  if (startingRun) return; // already submitting a previous click - ignore a rapid re-click
+  if (!confirm('Run Manager Referral, then Sign In & Sign Up, then Phase 1 & Phase 2 — all back to back?')) return;
+  startingRun = true;
+  updateActionButtons();
+  try {
+    const response = await fetch('/api/run-full-suite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ headless: wantHeadless }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Could not start the full run.');
+  } catch (error) {
+    alert(`Failed to start: ${error.message}`);
+  } finally {
+    startingRun = false;
+    updateActionButtons();
+  }
+});
+
+stopBtn.addEventListener('click', async () => {
+  stopBtn.disabled = true;
+  await fetch('/api/stop-tests', { method: 'POST' });
+});
+
+// ---- Live stream ------------------------------------------------------------
+const es = new EventSource('/api/stream');
+
+// Fired once per connection (including the browser's automatic reconnect
+// after a network blip) so a client that wasn't there when a run actually
+// started - a fresh page load, a refresh mid-run, or a reconnect - can
+// resync to the real server-side state instead of sitting on its default
+// "nothing is running" until the next incidental 'status'/'run-complete'
+// event happens to arrive. Previously nothing listened for this event at
+// all, so opening/refreshing the dashboard mid-run showed a fully idle UI
+// (no live panel, Run All/Stop not reflecting the busy state, wrong sidebar
+// dot) for as long as that gap lasted - and since the buttons looked
+// enabled, it let a user start a second, conflicting run against the same
+// project while one was already in flight.
+es.addEventListener('hello', (e) => {
+  const data = JSON.parse(e.data);
+  if (!data.running) {
+    runState = { running: false, project: null, testCount: 0, done: 0, passed: 0, failed: 0, tests: [], runningKey: null, startedAt: null };
+    stopElapsedTicker();
+  } else {
+    let done = 0, passed = 0, failed = 0, runningKey = null;
+    for (const r of (data.results || [])) {
+      if (r.status === 'passed') { done += 1; passed += 1; }
+      else if (r.status === 'failed' || r.status === 'timedOut') { done += 1; failed += 1; }
+      else if (r.status === 'running') { runningKey = r.key; }
+    }
+    runState = {
+      running: true, project: data.project, testCount: data.testCount,
+      done, passed, failed,
+      tests: data.tests || [], runningKey: runningKey || (data.tests && data.tests[0] ? data.tests[0].key : null),
+      startedAt: data.startedAt ? new Date(data.startedAt).getTime() : Date.now(),
+    };
+    startElapsedTicker();
+  }
+  renderSidebar();
+  updateCrossRunBanner();
+  updateActionButtons();
+  if (currentProjectId && runState.project === currentProjectId) {
+    livePanel.style.display = runState.running ? '' : 'none';
+    if (runState.running) updateLivePanelText();
+  }
+});
+
+es.addEventListener('run-start', (e) => {
+  const data = JSON.parse(e.data);
+  runState = {
+    running: true, project: data.project, testCount: data.testCount,
+    done: 0, passed: 0, failed: 0,
+    tests: data.tests || [], runningKey: data.tests && data.tests[0] ? data.tests[0].key : null,
+    startedAt: Date.now(),
+  };
+  renderSidebar();
+  updateCrossRunBanner();
+  updateActionButtons();
+  runOutcomeBanner.style.display = 'none';
+  if (data.project === currentProjectId) {
+    livePanel.style.display = '';
+    updateLivePanelText();
+  }
+  startElapsedTicker();
+});
+
+es.addEventListener('status', (e) => {
+  const data = JSON.parse(e.data);
+  if (!runState.running) return;
+
+  if (data.status === 'running') {
+    runState.runningKey = data.key;
+  } else if (data.status === 'passed' || data.status === 'failed' || data.status === 'timedOut') {
+    runState.done += 1;
+    if (data.status === 'passed') runState.passed += 1; else runState.failed += 1;
+    updateCrossRunBanner();
+  }
+
+  if (runState.project === currentProjectId) updateLivePanelText();
+});
+
+es.addEventListener('run-complete', (e) => {
+  const data = JSON.parse(e.data);
+  const finishedProject = runState.project;
+  runState = { running: false, project: null, testCount: 0, done: 0, passed: 0, failed: 0, tests: [], runningKey: null, startedAt: null };
+  stopElapsedTicker();
+
+  historyCache[finishedProject] = [data, ...(historyCache[finishedProject] || []).filter(r => r.runId !== data.runId)];
+  const finishedTotals = computeTotals(scopedResults(finishedProject, data));
+  projectHealth[finishedProject] = { status: finishedTotals.failed > 0 ? 'bad' : 'good', lastRun: data };
+
+  renderSidebar();
+  updateCrossRunBanner();
+  updateActionButtons();
+  if (!fullSuiteActive) refreshResumeAvailability();
+
+  if (finishedProject === currentProjectId) {
+    livePanel.style.display = 'none';
+    displayedReport = data;
+    renderReport(data, `Run ${data.runId}`);
+    renderHistory(currentProjectId);
+    renderRunOutcomeBanner(data);
+  }
+});
+
+// ---- Run Everything (Manager Referral -> Sign In/Up -> Phase 1/2) ---------
+es.addEventListener('full-suite-start', (e) => {
+  const data = JSON.parse(e.data);
+  fullSuiteActive = true;
+  fullSuiteBanner.style.display = '';
+  fullSuiteBanner.innerHTML = `<div class="banner">▶ Running everything: ${data.order.map((p) => p.label).join(' → ')}</div>`;
+  updateActionButtons();
+});
+
+es.addEventListener('full-suite-step', (e) => {
+  const data = JSON.parse(e.data);
+  fullSuiteBanner.innerHTML = `<div class="banner">▶ Running everything — step ${data.index + 1} of ${data.total}: <strong>${data.label}</strong></div>`;
+});
+
+es.addEventListener('full-suite-complete', (e) => {
+  const data = JSON.parse(e.data);
+  fullSuiteActive = false;
+  fullSuiteBanner.innerHTML = data.stopped
+    ? '<div class="banner">⏹ Full run stopped before finishing all projects. Use "Resume Where It Stopped" to pick back up.</div>'
+    : '<div class="banner">✓ Full run finished — every project has been run. Check each project\'s sidebar dot and Recent Runs for results.</div>';
+  setTimeout(() => { fullSuiteBanner.style.display = 'none'; }, 8000);
+  updateActionButtons();
+  refreshResumeAvailability();
+});
+
+es.addEventListener('resume-availability', (e) => {
+  const data = JSON.parse(e.data);
+  resumable = !!data.resumable;
+  updateActionButtons();
+});
+
+function renderRunOutcomeBanner(data) {
+  const completed = data.totals.passed + data.totals.failed;
+  if (data.stoppedByUser) {
+    runOutcomeBanner.className = 'run-outcome-banner stopped';
+    runOutcomeBanner.textContent = `⏹ Run was stopped manually after ${completed} of ${data.totals.total} tests completed. Remaining tests are marked "Stopped" below — use "Resume Where It Stopped" in the sidebar to pick back up from here.`;
+    runOutcomeBanner.style.display = '';
+  } else {
+    runOutcomeBanner.style.display = 'none';
+  }
+}
+
+init();
+</script>
+</body>
+</html>

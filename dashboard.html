@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automation Dashboard</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <style>
+    :root {
+      --bg: #f4f7ff;
+      --panel: rgba(255, 255, 255, 0.84);
+      --panel-strong: #ffffff;
+      --line: rgba(37, 54, 88, 0.12);
+      --ink: #1f2a44;
+      --muted: #66748f;
+      --accent: #2f6fed;
+      --accent-2: #7c4dff;
+      --good: #15a46a;
+      --bad: #e05252;
+      --shadow: 0 20px 60px rgba(31, 42, 68, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Aptos", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(47, 111, 237, 0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(124, 77, 255, 0.18), transparent 24%),
+        linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+      min-height: 100vh;
+    }
+
+    .shell {
+      position: relative;
+      min-height: 100vh;
+      padding: 28px;
+      overflow: hidden;
+    }
+
+    .orb {
+      position: fixed;
+      border-radius: 999px;
+      filter: blur(18px);
+      opacity: 0.45;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .orb.one { width: 180px; height: 180px; background: rgba(47, 111, 237, 0.22); top: 28px; left: 36px; }
+    .orb.two { width: 220px; height: 220px; background: rgba(124, 77, 255, 0.18); bottom: 42px; right: 50px; }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      max-width: 1600px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 22px;
+    }
+
+    .topbar {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 24px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(247,249,255,0.78));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      letter-spacing: -0.03em;
+    }
+
+    .brand p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .button {
+      border: 0;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    }
+
+    .button:hover { transform: translateY(-1px); }
+    .button.primary {
+      color: white;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 14px 28px rgba(47, 111, 237, 0.22);
+    }
+    .button.secondary {
+      background: rgba(255, 255, 255, 0.82);
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .sidebar,
+    .content,
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .sidebar {
+      padding: 18px;
+      align-self: start;
+      position: sticky;
+      top: 24px;
+    }
+
+    .sidebar h2,
+    .section-title {
+      margin: 0 0 10px;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+    }
+
+    .run-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+      max-height: calc(100vh - 190px);
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .run-item {
+      border: 1px solid transparent;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.82);
+      padding: 14px;
+      cursor: pointer;
+      transition: 0.15s ease;
+    }
+
+    .run-item:hover { border-color: rgba(47, 111, 237, 0.22); transform: translateY(-1px); }
+    .run-item.active {
+      border-color: rgba(47, 111, 237, 0.42);
+      box-shadow: 0 16px 34px rgba(47, 111, 237, 0.12);
+    }
+
+    .run-item .id {
+      font-weight: 800;
+      font-size: 0.95rem;
+    }
+
+    .run-item .meta,
+    .muted {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .mini-stats {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      background: rgba(31, 42, 68, 0.06);
+    }
+    .pill.good { background: rgba(21, 164, 106, 0.12); color: var(--good); }
+    .pill.bad { background: rgba(224, 82, 82, 0.12); color: var(--bad); }
+
+    .content {
+      padding: 18px;
+      min-width: 0;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .stat {
+      padding: 16px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(245,248,255,0.9));
+      border: 1px solid var(--line);
+    }
+
+    .stat .label { color: var(--muted); font-size: 0.82rem; }
+    .stat .value { margin-top: 8px; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .input, .select {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.9);
+      padding: 11px 14px;
+      font: inherit;
+      color: var(--ink);
+      min-width: 220px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.25fr 0.95fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .card {
+      padding: 16px;
+      min-width: 0;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+    }
+
+    .table th,
+    .table td {
+      padding: 12px 10px;
+      border-bottom: 1px solid rgba(31, 42, 68, 0.08);
+      text-align: left;
+      vertical-align: top;
+      font-size: 0.92rem;
+    }
+
+    .table th {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .row {
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+    .row:hover { background: rgba(47, 111, 237, 0.05); }
+    .row.selected { background: rgba(47, 111, 237, 0.09); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 0.76rem;
+      letter-spacing: 0.02em;
+    }
+    .badge.pass { background: rgba(21, 164, 106, 0.12); color: var(--good); }
+    .badge.fail { background: rgba(224, 82, 82, 0.12); color: var(--bad); }
+    .badge.skip { background: rgba(102, 116, 143, 0.12); color: var(--muted); }
+
+    .detail-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+
+    .detail-title h3 {
+      margin: 0;
+      font-size: 1.08rem;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .kv div {
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(31, 42, 68, 0.04);
+    }
+
+    .kv span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+    }
+
+    .test-list {
+      margin: 14px 0 0;
+      display: grid;
+      gap: 10px;
+      max-height: 420px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .test-item {
+      border-radius: 14px;
+      border: 1px solid rgba(31, 42, 68, 0.08);
+      background: rgba(255,255,255,0.82);
+      padding: 10px 12px;
+    }
+
+    .test-item .top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .empty {
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+      border: 1px dashed rgba(31, 42, 68, 0.16);
+      border-radius: 20px;
+      background: rgba(255,255,255,0.65);
+    }
+
+    @media (max-width: 1200px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .hero, .grid, .stats { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="orb one"></div>
+    <div class="orb two"></div>
+    <div id="app"></div>
+  </div>
+
+  <script>
+    const { useEffect, useMemo, useState } = React;
+    const h = React.createElement;
+
+    function badgeClass(status) {
+      const value = String(status || '').toLowerCase();
+      if (value.includes('pass')) return 'badge pass';
+      if (value.includes('fail')) return 'badge fail';
+      return 'badge skip';
+    }
+
+    function scenarioStatus(scenario) {
+      const summary = scenario && scenario.summary ? scenario.summary : {};
+      if ((summary.failed || 0) > 0) return 'fail';
+      if ((summary.passed || 0) > 0) return 'pass';
+      return 'skip';
+    }
+
+    function App() {
+      const [runs, setRuns] = useState([]);
+      const [selectedRunId, setSelectedRunId] = useState('');
+      const [runDetail, setRunDetail] = useState(null);
+      const [selectedScenarioId, setSelectedScenarioId] = useState('');
+      const [statusFilter, setStatusFilter] = useState('all');
+      const [search, setSearch] = useState('');
+      const [loading, setLoading] = useState(true);
+
+      function getPreferredRunIdFromUrl() {
+        try {
+          const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+          const queryParams = new URLSearchParams(window.location.search || '');
+          return hashParams.get('runId') || queryParams.get('runId') || '';
+        } catch (e) {
+          return '';
+        }
+      }
+
+      async function loadRuns(preferredRunId) {
+        setLoading(true);
+        const response = await fetch('/api/runs');
+        const data = await response.json();
+        const list = data.runs || [];
+        setRuns(list);
+
+        const nextRunId = preferredRunId || selectedRunId || (list[0] && list[0].runId) || '';
+        setSelectedRunId(nextRunId);
+        setLoading(false);
+        return nextRunId;
+      }
+
+      async function loadRun(runId) {
+        if (!runId) {
+          setRunDetail(null);
+          return;
+        }
+        const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`);
+        const data = await response.json();
+        const scenarios = data.scenarios || [];
+        setRunDetail(data);
+        setSelectedScenarioId((scenarios[0] && scenarios[0].reportSheetName) || '');
+      }
+
+      useEffect(() => {
+        const preferred = getPreferredRunIdFromUrl();
+        loadRuns(preferred).then((runId) => loadRun(runId)).catch(() => setLoading(false));
+      }, []);
+
+      useEffect(() => {
+        if (selectedRunId) {
+          loadRun(selectedRunId);
+        }
+      }, [selectedRunId]);
+
+      const selectedScenario = useMemo(() => {
+        if (!runDetail || !runDetail.scenarios) return null;
+        return runDetail.scenarios.find((scenario) => scenario.reportSheetName === selectedScenarioId) || runDetail.scenarios[0] || null;
+      }, [runDetail, selectedScenarioId]);
+
+      const filteredScenarios = useMemo(() => {
+          const scenarios = (runDetail && runDetail.scenarios) || [];
+          return scenarios.filter((scenario) => {
+          const status = scenarioStatus(scenario);
+          const matchesStatus = statusFilter === 'all' || status === statusFilter;
+          const haystack = [
+            scenario.reportSheetName,
+            scenario.selectedOptions && scenario.selectedOptions.entry,
+            scenario.selectedOptions && scenario.selectedOptions.address,
+            scenario.signupDetails && scenario.signupDetails.aadharNum,
+            scenario.signupDetails && scenario.signupDetails.division,
+          ].join(' ').toLowerCase();
+          const matchesSearch = !search || haystack.includes(search.toLowerCase());
+          return matchesStatus && matchesSearch;
+        });
+      }, [runDetail, statusFilter, search]);
+
+      const stats = useMemo(() => {
+        const scenarios = (runDetail && runDetail.scenarios) || [];
+        return scenarios.reduce((acc, scenario) => {
+          acc.total += 1;
+          acc.passed += scenario.summary ? scenario.summary.passed : 0;
+          acc.failed += scenario.summary ? scenario.summary.failed : 0;
+          acc.skipped += scenario.summary ? scenario.summary.skipped : 0;
+          return acc;
+        }, { total: 0, passed: 0, failed: 0, skipped: 0 });
+      }, [runDetail]);
+
+      function renderRunItem(run) {
+        const active = run.runId === selectedRunId ? 'run-item active' : 'run-item';
+        return h('div', {
+          key: run.runId,
+          className: active,
+          onClick: () => setSelectedRunId(run.runId)
+        },
+          h('div', { className: 'id' }, run.runId),
+          h('div', { className: 'meta' }, `${run.scenarioCount} scenarios`),
+          h('div', { className: 'mini-stats' },
+            h('span', { className: 'pill good' }, `Pass ${run.passed}`),
+            h('span', { className: 'pill bad' }, `Fail ${run.failed}`)
+          )
+        );
+      }
+
+      function renderScenarioRow(scenario) {
+        const selected = scenario.reportSheetName === selectedScenarioId ? 'row selected' : 'row';
+        const status = scenarioStatus(scenario);
+        return h('tr', {
+          key: scenario.reportSheetName,
+          className: selected,
+          onClick: () => setSelectedScenarioId(scenario.reportSheetName)
+        },
+          h('td', null, scenario.reportSheetName),
+          h('td', null, scenario.selectedOptions && scenario.selectedOptions.entry),
+          h('td', null, scenario.signupDetails && scenario.signupDetails.aadharNum),
+          h('td', null, scenario.selectedOptions && scenario.selectedOptions.address),
+          h('td', null, scenario.selectedOptions && scenario.selectedOptions.experience),
+          h('td', null, h('span', { className: badgeClass(status) }, status.toUpperCase()))
+        );
+      }
+
+      return h(React.Fragment, null,
+        h('div', { className: 'app' },
+          h('div', { className: 'topbar' },
+            h('div', { className: 'brand' },
+              h('h1', null, 'Automation Dashboard'),
+              h('p', null, 'Custom run overview for all scenario combinations, signup identity, and test results.')
+            ),
+            h('div', { className: 'toolbar' },
+              h('button', {
+                className: 'button secondary',
+                onClick: () => loadRuns(selectedRunId).then(loadRun)
+              }, 'Refresh'),
+              h('a', { className: 'button primary', href: '/', style: { textDecoration: 'none', display: 'inline-flex', alignItems: 'center' } }, 'Back to Flow')
+            )
+          ),
+          h('aside', { className: 'sidebar' },
+            h('h2', null, 'Runs'),
+            h('div', { className: 'muted' }, 'Pick a run to inspect its scenarios.'),
+            loading
+              ? h('div', { className: 'empty', style: { marginTop: '14px' } }, 'Loading runs...')
+              : h('div', { className: 'run-list' },
+                  runs.length
+                    ? runs.map(renderRunItem)
+                    : h('div', { className: 'empty' }, 'No report data yet. Run the automation once to populate this dashboard.')
+                )
+          ),
+          h('main', { className: 'content' },
+            h('div', { className: 'hero' },
+              h('div', { className: 'card' },
+                h('div', { className: 'section-title' }, 'Current Run'),
+                h('h2', { style: { margin: '0 0 8px' } }, runDetail ? runDetail.runId : 'No run selected'),
+                h('div', { className: 'muted' }, runDetail ? `${runDetail.scenarios.length} scenario reports loaded.` : 'Select a run from the sidebar.')
+              ),
+              h('div', { className: 'card' },
+                h('div', { className: 'section-title' }, 'Run Health'),
+                h('div', { className: 'mini-stats' },
+                  h('span', { className: 'pill' }, `Total ${stats.total}`),
+                  h('span', { className: 'pill good' }, `Passed ${stats.passed}`),
+                  h('span', { className: 'pill bad' }, `Failed ${stats.failed}`),
+                  h('span', { className: 'pill' }, `Skipped ${stats.skipped}`)
+                )
+              )
+            ),
+
+            h('div', { className: 'stats' },
+              h('div', { className: 'stat' }, h('div', { className: 'label' }, 'Scenarios'), h('div', { className: 'value' }, stats.total)),
+              h('div', { className: 'stat' }, h('div', { className: 'label' }, 'Passed'), h('div', { className: 'value' }, stats.passed)),
+              h('div', { className: 'stat' }, h('div', { className: 'label' }, 'Failed'), h('div', { className: 'value' }, stats.failed)),
+              h('div', { className: 'stat' }, h('div', { className: 'label' }, 'Skipped'), h('div', { className: 'value' }, stats.skipped))
+            ),
+
+            h('div', { className: 'controls' },
+              h('input', {
+                className: 'input',
+                placeholder: 'Search scenario, Aadhaar, or option...',
+                value: search,
+                onChange: (e) => setSearch(e.target.value)
+              }),
+              h('select', {
+                className: 'select',
+                value: statusFilter,
+                onChange: (e) => setStatusFilter(e.target.value)
+              },
+                h('option', { value: 'all' }, 'All statuses'),
+                h('option', { value: 'pass' }, 'Passed'),
+                h('option', { value: 'fail' }, 'Failed')
+              )
+            ),
+
+            h('div', { className: 'grid' },
+              h('section', { className: 'card' },
+                h('div', { className: 'detail-title' },
+                  h('h3', null, 'Scenarios'),
+                  h('span', { className: 'muted' }, `${filteredScenarios.length} shown`)
+                ),
+                filteredScenarios.length
+                  ? h('table', { className: 'table' },
+                      h('thead', null,
+                        h('tr', null,
+                          h('th', null, 'Tab'),
+                          h('th', null, 'Entry'),
+                          h('th', null, 'Aadhaar'),
+                          h('th', null, 'Address'),
+                          h('th', null, 'Experience'),
+                          h('th', null, 'Status')
+                        )
+                      ),
+                      h('tbody', null, filteredScenarios.map(renderScenarioRow))
+                    )
+                  : h('div', { className: 'empty' }, 'No scenarios match the current filter.')
+              ),
+
+              h('section', { className: 'card' },
+                selectedScenario
+                  ? h(React.Fragment, null,
+                      h('div', { className: 'detail-title' },
+                        h('h3', null, selectedScenario.reportSheetName),
+                        h('span', { className: badgeClass(scenarioStatus(selectedScenario)) },
+                          scenarioStatus(selectedScenario).toUpperCase()
+                        )
+                      ),
+                      h('div', { className: 'muted' }, `Created at ${selectedScenario.createdAt || ''}`),
+                      h('div', { className: 'kv' },
+                        h('div', null, h('span', null, 'Entry'), h('strong', null, selectedScenario.selectedOptions && selectedScenario.selectedOptions.entry)),
+                        h('div', null, h('span', null, 'Address'), h('strong', null, selectedScenario.selectedOptions && selectedScenario.selectedOptions.address)),
+                        h('div', null, h('span', null, 'Vehicle Number'), h('strong', null, selectedScenario.selectedOptions && selectedScenario.selectedOptions.vehicleNumber)),
+                        h('div', null, h('span', null, 'Experience'), h('strong', null, selectedScenario.selectedOptions && selectedScenario.selectedOptions.experience)),
+                        h('div', null, h('span', null, 'Aadhaar'), h('strong', null, selectedScenario.signupDetails && selectedScenario.signupDetails.aadharNum)),
+                        h('div', null, h('span', null, 'Division'), h('strong', null, selectedScenario.signupDetails && selectedScenario.signupDetails.division))
+                      ),
+                      h('h4', { style: { margin: '18px 0 8px' } }, 'Test Cases'),
+                      h('div', { className: 'test-list' },
+                        (selectedScenario.tests || []).map((testRow, index) =>
+                          h('div', { className: 'test-item', key: `${index}-${testRow.name}` },
+                            h('div', { className: 'top' },
+                              h('strong', null, testRow.name),
+                              h('span', { className: badgeClass(testRow.status) }, String(testRow.status || '').toUpperCase())
+                            ),
+                            h('div', { className: 'muted', style: { marginTop: '6px' } }, `Duration: ${testRow.duration || '0'} ms`)
+                          )
+                        )
+                      )
+                    )
+                  : h('div', { className: 'empty' }, 'Select a scenario to inspect the test cases.')
+              )
+            )
+          )
+        )
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('app')).render(h(App));
+  </script>
+</body>
+</html>

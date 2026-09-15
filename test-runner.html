@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Test Runner Dashboard</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<style>
+  :root {
+    --page: #0f0f0f;
+    --surface: #ffffff;
+    --ink: #0603bd;
+    --ink-2: #52514e;
+    --ink-muted: #898781;
+    --line: #e1e0d9;
+    --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6;
+    --accent-dark: #184f95;
+    --accent-wash: rgba(42,120,214,0.08);
+    --good: #0ca30c;
+    --good-wash: rgba(12,163,12,0.10);
+    --critical: #d03b3b;
+    --critical-wash: rgba(208,59,59,0.09);
+    --warning: #b9790a;
+    --warning-wash: rgba(250,178,25,0.16);
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(11,11,11,0.04), 0 8px 24px rgba(11,11,11,0.05);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--ink);
+    font-size: 13.5px;
+  }
+  .shell { max-width: 1440px; margin: 0 auto; padding: 22px 26px 60px; }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+  .header h1 { font-size: 19px; margin: 0; letter-spacing: -0.01em; }
+  .header .sub { color: var(--ink-2); font-size: 12.5px; margin-top: 3px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  .conn { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+  .conn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-muted); }
+  .conn.online .dot { background: var(--good); box-shadow: 0 0 0 3px var(--good-wash); }
+  .conn.offline .dot { background: var(--critical); box-shadow: 0 0 0 3px var(--critical-wash); }
+
+  .link-btn {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  .link-btn:hover { border-color: var(--accent); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+  }
+  .toolbar .search {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font: inherit;
+    background: var(--page);
+  }
+  .toolbar .search:focus { outline: none; border-color: var(--accent); }
+
+  .btn {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-dark); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover:not(:disabled) { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
+  .btn.danger { background: var(--critical); border-color: var(--critical); color: #fff; }
+  .btn.danger:hover:not(:disabled) { background: #a92e2e; border-color: #a92e2e; }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--ink-2); padding: 4px 8px; }
+
+  .toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--ink-2);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 1080px) { .main-grid { grid-template-columns: 1fr; } }
+
+  .panel-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .panel-title h2 { font-size: 13.5px; margin: 0; }
+  .panel-title .count { color: var(--ink-muted); font-size: 12px; }
+
+  .explorer { max-height: 560px; overflow-y: auto; }
+  .file-group { border-bottom: 1px solid var(--line); }
+  .file-group:last-child { border-bottom: none; }
+  .file-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    background: #f6f6f4;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 12.5px;
+  }
+  .file-header .chev { color: var(--ink-muted); font-size: 11px; width: 10px; }
+  .file-header .path { color: var(--ink-2); font-weight: 500; }
+  .describe-header {
+    padding: 7px 14px 7px 30px;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-muted);
+    font-weight: 700;
+  }
+
+  .test-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px 7px 30px;
+    border-top: 1px solid #f2f2ef;
+  }
+  .test-row:hover { background: var(--accent-wash); }
+  .test-row .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .test-row input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+
+  .run-one {
+    border: none;
+    background: transparent;
+    color: var(--ink-muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 3px 6px;
+    border-radius: 6px;
+  }
+  .run-one:hover { background: var(--accent-wash); color: var(--accent-dark); }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .badge .bdot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge.passed { background: var(--good-wash); color: var(--good); }
+  .badge.passed .bdot { background: var(--good); }
+  .badge.failed, .badge.timedOut { background: var(--critical-wash); color: var(--critical); }
+  .badge.failed .bdot, .badge.timedOut .bdot { background: var(--critical); }
+  .badge.running { background: var(--accent-wash); color: var(--accent-dark); }
+  .badge.running .bdot { background: var(--accent); animation: pulse 1s infinite; }
+  .badge.stopped { background: var(--warning-wash); color: var(--warning); }
+  .badge.stopped .bdot { background: var(--warning); }
+  .badge.queued, .badge.skipped, .badge.idle { background: #efeeea; color: var(--ink-muted); }
+  .badge.queued .bdot, .badge.skipped .bdot, .badge.idle .bdot { background: var(--ink-muted); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  .queue-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--line);
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent-wash);
+    color: var(--accent-dark);
+    padding: 4px 6px 4px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    max-width: 260px;
+  }
+  .chip span.txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip button {
+    border: none;
+    background: rgba(11,11,11,0.08);
+    color: var(--ink-2);
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 14px; }
+  .stat-tile { background: var(--page); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; text-align: center; }
+  .stat-tile .num { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat-tile .lbl { font-size: 10.5px; color: var(--ink-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .stat-tile.passed .num { color: var(--good); }
+  .stat-tile.failed .num { color: var(--critical); }
+  .stat-tile.running .num { color: var(--accent); }
+
+  .progress-track { height: 6px; background: var(--line); border-radius: 999px; margin: 0 14px 14px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.25s ease; }
+
+  .console {
+    margin: 0 14px 14px;
+    background: #14151a;
+    color: #d7d9dd;
+    border-radius: 8px;
+    height: 300px;
+    overflow-y: auto;
+    padding: 10px 12px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 11.5px;
+    line-height: 1.55;
+  }
+  .console .line { white-space: pre-wrap; word-break: break-all; }
+  .console .line.stderr { color: #ef9a9a; }
+  .console .empty-console { color: #6b6f76; font-style: italic; }
+
+  table.report { width: 100%; border-collapse: collapse; }
+  table.report th, table.report td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: middle;
+    font-size: 12.5px;
+  }
+  table.report th { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); font-weight: 700; }
+  table.report tr:last-child td { border-bottom: none; }
+  table.report td.dur { font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+  .thumb { width: 64px; height: 40px; object-fit: cover; border-radius: 5px; border: 1px solid var(--line); cursor: pointer; }
+  .no-shot { color: var(--ink-muted); font-size: 11.5px; }
+
+  .empty-state { padding: 30px; text-align: center; color: var(--ink-muted); }
+
+  .history-item { border-bottom: 1px solid var(--line); }
+  .history-item:last-child { border-bottom: none; }
+  .history-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px;
+    cursor: pointer;
+  }
+  .history-summary:hover { background: var(--accent-wash); }
+  .history-summary .chev { color: var(--ink-muted); font-size: 11px; width: 10px; }
+  .history-summary .when { font-weight: 600; flex: 0 0 160px; }
+  .history-summary .pills { display: flex; gap: 6px; margin-left: auto; }
+  .history-detail { padding: 0 14px 14px 34px; }
+
+  .section-gap { margin-top: 18px; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(11,11,11,0.55);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+    padding: 30px;
+  }
+  .modal-overlay img { max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+
+  .lightbox-close {
+    position: fixed; top: 20px; right: 26px; color: #fff; background: rgba(255,255,255,0.15);
+    border: none; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; font-size: 16px;
+  }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+
+<script>
+const { useEffect, useMemo, useRef, useState, useCallback } = React;
+const h = React.createElement;
+
+function formatDuration(ms) {
+  if (!ms || ms <= 0) return '—';
+  if (ms < 1000) return Math.round(ms) + 'ms';
+  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+  const m = Math.floor(ms / 60000);
+  const s = Math.round((ms % 60000) / 1000);
+  return `${m}m ${s}s`;
+}
+
+function statusLabel(status) {
+  return {
+    passed: 'Passed', failed: 'Failed', timedOut: 'Timed Out',
+    running: 'Running', queued: 'Queued', skipped: 'Skipped', stopped: 'Stopped',
+  }[status] || 'Idle';
+}
+
+function StatusBadge({ status }) {
+  const s = status || 'idle';
+  return h('span', { className: `badge ${s}` }, h('span', { className: 'bdot' }), statusLabel(s));
+}
+
+function groupTests(tests) {
+  const byFile = new Map();
+  for (const t of tests) {
+    if (!byFile.has(t.file)) byFile.set(t.file, new Map());
+    const byDescribe = byFile.get(t.file);
+    const dKey = t.describe || '(root)';
+    if (!byDescribe.has(dKey)) byDescribe.set(dKey, []);
+    byDescribe.get(dKey).push(t);
+  }
+  return Array.from(byFile.entries()).map(([file, describeMap]) => ({
+    file,
+    describes: Array.from(describeMap.entries()).map(([describe, list]) => ({ describe, tests: list })),
+  }));
+}
+
+function App() {
+  const [tests, setTests] = useState([]);
+  const [selected, setSelected] = useState(() => new Set(JSON.parse(localStorage.getItem('tr_selected') || '[]')));
+  const [collapsed, setCollapsed] = useState(() => new Set());
+  const [search, setSearch] = useState('');
+  const [headless, setHeadless] = useState(() => localStorage.getItem('tr_headless') === 'true');
+  const [running, setRunning] = useState(false);
+  const [runMeta, setRunMeta] = useState(null);
+  const [liveStatus, setLiveStatus] = useState(new Map());
+  const [logs, setLogs] = useState([]);
+  const [currentReport, setCurrentReport] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [expandedRuns, setExpandedRuns] = useState(new Set());
+  const [conn, setConn] = useState('connecting');
+  const [lightbox, setLightbox] = useState(null);
+
+  const consoleRef = useRef(null);
+  const testsRef = useRef([]);
+  testsRef.current = tests;
+
+  useEffect(() => { localStorage.setItem('tr_selected', JSON.stringify(Array.from(selected))); }, [selected]);
+  useEffect(() => { localStorage.setItem('tr_headless', String(headless)); }, [headless]);
+
+  const refreshTests = useCallback((forceRefresh) => {
+    fetch(forceRefresh ? '/api/tests?refresh=true' : '/api/tests').then(r => r.json()).then(data => {
+      if (data.ok) setTests(data.tests);
+    });
+  }, []);
+
+  const refreshHistory = useCallback(() => {
+    fetch('/api/history').then(r => r.json()).then(data => {
+      if (data.ok) {
+        setHistory(data.history);
+        setCurrentReport((prev) => prev || data.history[0] || null);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    refreshTests();
+    refreshHistory();
+
+    const es = new EventSource('/api/stream');
+    es.onopen = () => setConn('online');
+    es.onerror = () => setConn('offline');
+
+    es.addEventListener('hello', (e) => {
+      const data = JSON.parse(e.data);
+      setConn('online');
+      if (data.running) {
+        setRunning(true);
+        const m = new Map();
+        for (const r of data.results) m.set(r.key, r);
+        setLiveStatus(m);
+      }
+    });
+
+    es.addEventListener('run-start', (e) => {
+      const data = JSON.parse(e.data);
+      setRunning(true);
+      setRunMeta(data);
+      setLogs([]);
+      const m = new Map();
+      (data.tests || []).forEach((t, i) => m.set(t.key, { status: i === 0 ? 'running' : 'queued', duration: 0 }));
+      setLiveStatus(m);
+    });
+
+    es.addEventListener('log', (e) => {
+      const data = JSON.parse(e.data);
+      setLogs((prev) => {
+        const next = prev.length > 3000 ? prev.slice(prev.length - 3000) : prev.slice();
+        next.push(data);
+        return next;
+      });
+    });
+
+    es.addEventListener('status', (e) => {
+      const data = JSON.parse(e.data);
+      setLiveStatus((prev) => {
+        const next = new Map(prev);
+        next.set(data.key, { status: data.status, duration: data.duration });
+        return next;
+      });
+    });
+
+    es.addEventListener('run-complete', (e) => {
+      const data = JSON.parse(e.data);
+      setRunning(false);
+      setRunMeta(null);
+      setCurrentReport(data);
+      setHistory((prev) => [data, ...prev.filter((r) => r.runId !== data.runId)]);
+    });
+
+    return () => es.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const el = consoleRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    if (nearBottom) el.scrollTop = el.scrollHeight;
+  }, [logs]);
+
+  const filteredTests = useMemo(() => {
+    if (!search.trim()) return tests;
+    const q = search.toLowerCase();
+    return tests.filter((t) =>
+      t.title.toLowerCase().includes(q) ||
+      t.describe.toLowerCase().includes(q) ||
+      t.file.toLowerCase().includes(q)
+    );
+  }, [tests, search]);
+
+  const grouped = useMemo(() => groupTests(filteredTests), [filteredTests]);
+
+  function toggleGroupCollapse(file) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.has(file) ? next.delete(file) : next.add(file);
+      return next;
+    });
+  }
+
+  function toggleSelect(key) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  function toggleSelectGroup(groupTests, checked) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const t of groupTests) checked ? next.add(t.key) : next.delete(t.key);
+      return next;
+    });
+  }
+
+  function clearSelection() { setSelected(new Set()); }
+
+  function launchRun(testList) {
+    fetch('/api/run-tests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tests: testList, headless }),
+    }).then(r => r.json()).then((data) => {
+      if (!data.ok) alert(data.message || 'Failed to start run.');
+    });
+  }
+
+  function runSingle(test) { launchRun([{ file: test.file, line: test.line }]); }
+  function runSelected() {
+    const list = tests.filter((t) => selected.has(t.key)).map((t) => ({ file: t.file, line: t.line }));
+    if (!list.length) return alert('Select at least one test first.');
+    launchRun(list);
+  }
+  function runAll() { launchRun([]); }
+  function stopRun() { fetch('/api/stop-tests', { method: 'POST' }); }
+
+  const selectedTestObjs = tests.filter((t) => selected.has(t.key));
+
+  const liveTotals = useMemo(() => {
+    const acc = { total: 0, passed: 0, failed: 0, running: 0, queued: 0 };
+    for (const [, v] of liveStatus) {
+      acc.total += 1;
+      if (v.status === 'passed') acc.passed += 1;
+      else if (v.status === 'failed' || v.status === 'timedOut') acc.failed += 1;
+      else if (v.status === 'running') acc.running += 1;
+      else acc.queued += 1;
+    }
+    return acc;
+  }, [liveStatus]);
+
+  function renderTestRow(t) {
+    const status = liveStatus.get(t.key);
+    return h('div', { className: 'test-row', key: t.key },
+      h('input', {
+        type: 'checkbox',
+        checked: selected.has(t.key),
+        onChange: () => toggleSelect(t.key),
+        disabled: running,
+      }),
+      h('span', { className: 'title', title: t.title }, t.title),
+      status ? h(StatusBadge, { status: status.status }) : null,
+      status && status.duration ? h('span', { style: { fontSize: '11px', color: 'var(--ink-muted)', width: '48px', textAlign: 'right' } }, formatDuration(status.duration)) : null,
+      h('button', { className: 'run-one', title: 'Run just this test', onClick: () => runSingle(t), disabled: running }, '▶')
+    );
+  }
+
+  function renderReportTable(entry) {
+    if (!entry || !entry.results || !entry.results.length) {
+      return h('div', { className: 'empty-state' }, 'No results to show yet.');
+    }
+    return h('table', { className: 'report' },
+      h('thead', null, h('tr', null,
+        h('th', null, 'Test Case'),
+        h('th', null, 'Duration'),
+        h('th', null, 'Status'),
+        h('th', null, 'Screenshot')
+      )),
+      h('tbody', null, entry.results.map((r) =>
+        h('tr', { key: r.key },
+          h('td', null,
+            h('div', null, r.title),
+            h('div', { style: { color: 'var(--ink-muted)', fontSize: '11px' } }, `${r.file} · ${r.describe}`)
+          ),
+          h('td', { className: 'dur' }, formatDuration(r.duration)),
+          h('td', null, h(StatusBadge, { status: r.status })),
+          h('td', null,
+            r.screenshot
+              ? h('img', { className: 'thumb', src: r.screenshot, onClick: () => setLightbox(r.screenshot) })
+              : h('span', { className: 'no-shot' }, '—')
+          )
+        )
+      ))
+    );
+  }
+
+  function toggleHistoryExpand(runId) {
+    setExpandedRuns((prev) => {
+      const next = new Set(prev);
+      next.has(runId) ? next.delete(runId) : next.add(runId);
+      return next;
+    });
+  }
+
+  return h('div', { className: 'shell' },
+    h('div', { className: 'header' },
+      h('div', null,
+        h('h1', null, 'Test Runner Dashboard'),
+        h('div', { className: 'sub' }, 'Run, watch, and review every automated test — no terminal required.')
+      ),
+      h('div', { className: 'header-right' },
+        h('label', { className: 'toggle' },
+          h('input', { type: 'checkbox', checked: headless, onChange: (e) => setHeadless(e.target.checked), disabled: running }),
+          'Run headless'
+        ),
+        h('div', { className: `conn ${conn}` }, h('span', { className: 'dot' }), conn === 'online' ? 'Live' : conn === 'offline' ? 'Reconnecting…' : 'Connecting…'),
+        h('a', { className: 'link-btn', href: '/report', target: '_blank' }, 'Full Playwright Report'),
+        h('a', { className: 'link-btn', href: '/dashboard' }, 'Scenario Dashboard')
+      )
+    ),
+
+    h('div', { className: 'card toolbar' },
+      h('input', {
+        className: 'search',
+        placeholder: 'Search tests by title, describe block, or file…',
+        value: search,
+        onChange: (e) => setSearch(e.target.value),
+      }),
+      h('button', { className: 'btn primary', onClick: runAll, disabled: running }, '▶ Run All'),
+      h('button', { className: 'btn', onClick: runSelected, disabled: running || !selected.size }, `Run Selected (${selected.size})`),
+      h('button', { className: 'btn ghost', onClick: clearSelection, disabled: !selected.size || running }, 'Clear Selection'),
+      h('button', { className: 'btn danger', onClick: stopRun, disabled: !running }, '■ Stop'),
+      h('button', { className: 'btn ghost', onClick: () => refreshTests(true), disabled: running }, '⟳ Refresh Tests')
+    ),
+
+    h('div', { className: 'main-grid' },
+      h('div', { className: 'card' },
+        h('div', { className: 'panel-title' },
+          h('h2', null, 'Test Explorer'),
+          h('span', { className: 'count' }, `${filteredTests.length} of ${tests.length} tests`)
+        ),
+        h('div', { className: 'explorer' },
+          grouped.length === 0
+            ? h('div', { className: 'empty-state' }, tests.length ? 'No tests match your search.' : 'Loading tests…')
+            : grouped.map((g) => {
+                const allKeysInFile = g.describes.flatMap((d) => d.tests);
+                const allSelected = allKeysInFile.every((t) => selected.has(t.key));
+                const isCollapsed = collapsed.has(g.file);
+                return h('div', { className: 'file-group', key: g.file },
+                  h('div', { className: 'file-header', onClick: () => toggleGroupCollapse(g.file) },
+                    h('span', { className: 'chev' }, isCollapsed ? '▶' : '▼'),
+                    h('input', {
+                      type: 'checkbox',
+                      checked: allSelected,
+                      onClick: (e) => e.stopPropagation(),
+                      onChange: (e) => toggleSelectGroup(allKeysInFile, e.target.checked),
+                      disabled: running,
+                    }),
+                    h('span', { className: 'path' }, g.file),
+                    h('span', { style: { marginLeft: 'auto', color: 'var(--ink-muted)', fontWeight: 500 } }, `${allKeysInFile.length}`)
+                  ),
+                  !isCollapsed && g.describes.map((d) =>
+                    h('div', { key: d.describe },
+                      h('div', { className: 'describe-header' }, d.describe),
+                      d.tests.map(renderTestRow)
+                    )
+                  )
+                );
+              })
+        ),
+        selectedTestObjs.length > 0 && h('div', { className: 'queue-strip' },
+          selectedTestObjs.map((t) =>
+            h('span', { className: 'chip', key: t.key },
+              h('span', { className: 'txt', title: t.title }, t.title),
+              h('button', { onClick: () => toggleSelect(t.key), disabled: running }, '×')
+            )
+          )
+        )
+      ),
+
+      h('div', null,
+        h('div', { className: 'card' },
+          h('div', { className: 'panel-title' },
+            h('h2', null, running ? `Running… ${runMeta ? `(${liveTotals.total}/${runMeta.testCount})` : ''}` : 'Run Console'),
+            running && h('span', { className: 'count' }, `${liveTotals.passed} passed · ${liveTotals.failed} failed`)
+          ),
+          h('div', { className: 'stat-row' },
+            h('div', { className: 'stat-tile' }, h('div', { className: 'num' }, liveTotals.total), h('div', { className: 'lbl' }, 'Total')),
+            h('div', { className: 'stat-tile passed' }, h('div', { className: 'num' }, liveTotals.passed), h('div', { className: 'lbl' }, 'Passed')),
+            h('div', { className: 'stat-tile failed' }, h('div', { className: 'num' }, liveTotals.failed), h('div', { className: 'lbl' }, 'Failed')),
+            h('div', { className: 'stat-tile running' }, h('div', { className: 'num' }, liveTotals.running), h('div', { className: 'lbl' }, 'Running'))
+          ),
+          runMeta && h('div', { className: 'progress-track' },
+            h('div', { className: 'progress-fill', style: { width: `${runMeta.testCount ? ((liveTotals.passed + liveTotals.failed) / runMeta.testCount) * 100 : 0}%` } })
+          ),
+          h('div', { className: 'console', ref: consoleRef },
+            logs.length === 0
+              ? h('div', { className: 'empty-console' }, 'Logs will appear here once a run starts…')
+              : logs.map((l, i) => h('div', { className: `line ${l.stream}`, key: i }, l.line))
+          )
+        )
+      )
+    ),
+
+    h('div', { className: 'card section-gap' },
+      h('div', { className: 'panel-title' },
+        h('h2', null, 'Overall Report'),
+        currentReport && h('span', { className: 'count' },
+          `Run ${currentReport.runId} · ${currentReport.totals.passed} passed, ${currentReport.totals.failed} failed, ${currentReport.totals.skipped} skipped`
+        )
+      ),
+      currentReport ? renderReportTable(currentReport) : h('div', { className: 'empty-state' }, 'Run a test to see results here.')
+    ),
+
+    h('div', { className: 'card section-gap' },
+      h('div', { className: 'panel-title' },
+        h('h2', null, 'History'),
+        h('span', { className: 'count' }, `${history.length} run(s)`)
+      ),
+      history.length === 0
+        ? h('div', { className: 'empty-state' }, 'No past runs yet.')
+        : history.map((entry) => {
+            const expanded = expandedRuns.has(entry.runId);
+            return h('div', { className: 'history-item', key: entry.runId },
+              h('div', { className: 'history-summary', onClick: () => toggleHistoryExpand(entry.runId) },
+                h('span', { className: 'chev' }, expanded ? '▼' : '▶'),
+                h('span', { className: 'when' }, new Date(entry.startedAt).toLocaleString()),
+                h('span', { style: { color: 'var(--ink-muted)' } }, `${entry.totals.total} tests`),
+                h('div', { className: 'pills' },
+                  h('span', { className: 'badge passed' }, h('span', { className: 'bdot' }), `${entry.totals.passed} Pass`),
+                  entry.totals.failed > 0 && h('span', { className: 'badge failed' }, h('span', { className: 'bdot' }), `${entry.totals.failed} Fail`),
+                  entry.totals.stopped > 0 && h('span', { className: 'badge stopped' }, h('span', { className: 'bdot' }), `${entry.totals.stopped} Stopped`)
+                )
+              ),
+              expanded && h('div', { className: 'history-detail' }, renderReportTable(entry))
+            );
+          })
+    ),
+
+    lightbox && h('div', { className: 'modal-overlay', onClick: () => setLightbox(null) },
+      h('button', { className: 'lightbox-close', onClick: () => setLightbox(null) }, '✕'),
+      h('img', { src: lightbox })
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('app')).render(h(App));
+</script>
+</body>
+</html>
