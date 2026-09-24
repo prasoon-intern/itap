@@ -25,29 +25,52 @@ const screenshotsDir = path.join(__dirname, "dashboard-screenshots");
 // tests/ManagerReferral/*.spec.js, matching every other module.
 //
 // Candidate-facing tests live under tests/Candidate/ (see pages/Candidate/ and
-// tests/Candidate/ — one file per feature cluster: SignUpSignIn.spec.js,
-// Phase1.spec.js, and Phase2.spec.js). The former end-to-end "Full Candidate
-// Flow" file was removed (2026-09-02) — createFreshInterviewCandidate.js
+// tests/Candidate/ — one file per feature cluster: SignIn.spec.js,
+// SignUp.spec.js, Phase1.spec.js, and Phase2.spec.js). The former end-to-end
+// "Full Candidate Flow" file was removed (2026-09-02) — createFreshInterviewCandidate.js
 // already covers getting a fresh candidate through signup/Phase 1/Phase 2
 // for every other module, so the standalone 58-step E2E duplicate wasn't
-// needed. The dashboard splits the 3 remaining files into two logical
+// needed. The dashboard splits the 4 remaining files into two logical
 // projects, purely by file now (no more title/describe parsing needed):
-// - "signin": SignUpSignIn.spec.js.
+// - "signin": SignIn.spec.js and SignUp.spec.js.
 // - "phase1phase2": Phase1.spec.js and Phase2.spec.js.
+//
+// SignIn.spec.js/SignUp.spec.js (2026-09-16) replaced the old, single
+// SignUpSignIn.spec.js — that file's ad-hoc TC-XXX/E-XX/P-XX ids weren't
+// traceable to any Excel sheet at all. The two new files are built from
+// Test Cases/candidateSignInSignUp.xlsx (split out of ManagerReferral_TestCases.xlsx's
+// CandidateAuth_TestCases sheet, which never belonged bundled in there),
+// matching the same Excel-traceable "// Excel TC_XX" convention as
+// ManagerReferral's own Page.spec.js/Report.spec.js. This dropped the old
+// file's Forgot Password/concurrency/double-click/refresh-safety coverage,
+// none of which exists in the new sheet yet — a deliberate scope choice, not
+// an oversight; the old page-object methods for that coverage are still
+// there in pages/Candidate/SignUpSignIn.js if it's added back later.
 const PROJECTS = {
     signin: {
         id: "signin",
-        label: "Sign In & Sign Up",
-        description: "Candidate authentication: sign up, sign in, and Forgot Password coverage.",
+        label: "Candidate Sign In & Sign Up",
+        description: "Candidate authentication: Sign In and Sign Up field validations, built from candidateSignInSignUp.xlsx.",
         dir: __dirname,
-        testFilter: (t) => t.file === "Candidate/SignUpSignIn.spec.js",
+        testFilter: (t) => t.file === "Candidate/SignIn.spec.js" || t.file === "Candidate/SignUp.spec.js",
     },
     phase1phase2: {
         id: "phase1phase2",
-        label: "Phase 1 & Phase 2 (Application Form)",
+        label: "Candidate Application Form — Phase 1 & Phase 2",
+        // Sidebar nav renders this via innerHTML specifically so the <br>
+        // below works (see automation-dashboard.html's renderSidebar) - every
+        // OTHER place project.label is used (page header, banners, exported
+        // report title) reads the plain single-line `label` above instead,
+        // since those use textContent or escapeHtml() where a literal <br>
+        // would show up as broken raw text rather than an actual line break.
+        sidebarLabel: "Candidate Application Form<br>Phase 1 & Phase 2",
         description: "Personal Details, Qualification, Experience Details, and Document Upload coverage — happy-path plus negative/edge cases.",
         dir: __dirname,
-        testFilter: (t) => t.file === "Candidate/Phase1.spec.js" || t.file === "Candidate/Phase2.spec.js",
+        // Phase 2 is deferred (user, 2026-09-18: "not working on phase 2 right
+        // now") - temporarily excluded from the dashboard so its legacy tests
+        // don't show up alongside Phase 1's real, verified ones. Re-add
+        // `|| t.file === "Candidate/Phase2.spec.js"` when Phase 2 reopens.
+        testFilter: (t) => t.file === "Candidate/Phase1.spec.js",
     },
     referral: {
         id: "referral",
@@ -133,6 +156,14 @@ app.get("/test-runner", (req, res) => {
 });
 
 app.get("/automation-dashboard", (req, res) => {
+    // Without this, sendFile() sets only Last-Modified/ETag - browsers can
+    // still serve a stale cached copy of this file without even revalidating,
+    // which is exactly what happened live (2026-09-16): a fix to this file's
+    // own client-side logic (belongsToProject) didn't take effect in an
+    // already-open browser tab even after the server was restarted, because
+    // the browser never re-fetched it at all. Forces a fresh fetch (with
+    // conditional-GET revalidation still allowed) every time this page loads.
+    res.set("Cache-Control", "no-cache");
     res.sendFile(path.join(__dirname, "automation-dashboard.html"));
 });
 
@@ -282,7 +313,7 @@ function listAllTests(projectDir, testFilter) {
                             // Restricts a project's test list to just its own tests
                             // when it shares its "dir" with another project (e.g.
                             // phase1phase2 and signin both use the repo root) — can
-                            // filter by file, since signin (SignUpSignIn.spec.js) and
+                            // filter by file, since signin (SignIn.spec.js/SignUp.spec.js) and
                             // phase1phase2 (Phase1.spec.js/Phase2.spec.js) are now
                             // separate files rather than describe blocks within one file.
                             if (testFilter && !testFilter(test)) continue;

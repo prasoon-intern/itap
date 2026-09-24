@@ -206,7 +206,10 @@
     <div class="card" id="resultsCard" style="display:none;">
       <div class="card-head">
         <span>Results — <span id="resultsRunLabel"></span></span>
-        <button type="button" class="btn ghost" id="downloadReportBtn" style="padding:5px 12px; font-size:0.8em;">⬇ Download Report</button>
+        <span style="display:flex; align-items:center; gap:14px;">
+          <span id="resultsTotalDuration" style="font-weight:700; color:var(--ink);"></span>
+          <button type="button" class="btn ghost" id="downloadReportBtn" style="padding:5px 12px; font-size:0.8em;">⬇ Download Report</button>
+        </span>
       </div>
       <table class="results-table">
         <colgroup>
@@ -253,6 +256,7 @@ const failuresBody = document.getElementById('failuresBody');
 const resultsCard = document.getElementById('resultsCard');
 const resultsBody = document.getElementById('resultsBody');
 const resultsRunLabel = document.getElementById('resultsRunLabel');
+const resultsTotalDuration = document.getElementById('resultsTotalDuration');
 const historyBody = document.getElementById('historyBody');
 const reportLink = document.getElementById('reportLink');
 const modeToggle = document.getElementById('modeToggle');
@@ -585,7 +589,14 @@ function buildDescription(title) {
 // phase1phase2 testFilter.
 function belongsToProject(projectId, r) {
   if (projectId === 'signin') {
-    return r.file === 'Candidate/SignUpSignIn.spec.js';
+    // Candidate/SignUpSignIn.spec.js was retired 2026-09-16 in favor of
+    // SignIn.spec.js/SignUp.spec.js (see server.js's PROJECTS.signin.testFilter,
+    // which this mirrors) - a run recorded before that rename still legitimately
+    // matches the old name, so it's kept here rather than dropped, alongside
+    // the two new files.
+    return r.file === 'Candidate/SignUpSignIn.spec.js'
+      || r.file === 'Candidate/SignIn.spec.js'
+      || r.file === 'Candidate/SignUp.spec.js';
   }
   if (projectId === 'phase1phase2') {
     return r.file === 'Candidate/Phase1.spec.js' || r.file === 'Candidate/Phase2.spec.js';
@@ -878,7 +889,7 @@ function renderSidebar() {
   for (const p of projects) {
     const item = document.createElement('button');
     item.className = 'nav-item' + (p.id === currentProjectId ? ' active' : '');
-    item.innerHTML = `<span>${p.label}</span><span class="dot ${healthOf(p.id)}"></span>`;
+    item.innerHTML = `<span>${p.sidebarLabel || p.label}</span><span class="dot ${healthOf(p.id)}"></span>`;
     item.addEventListener('click', () => selectProject(p.id));
     projectNav.appendChild(item);
   }
@@ -1069,6 +1080,7 @@ function renderReport(entry, label) {
     failuresCard.style.display = 'none';
     resultsCard.style.display = '';
     resultsRunLabel.textContent = label;
+    resultsTotalDuration.textContent = '';
     resultsBody.innerHTML = `<tr><td colspan="8" class="empty-note">Run ${escapeHtml(entry.runId)} was recorded before this module's test files were reorganized, so its results can't be matched to today's tests. It isn't blank - it just predates the current file layout.</td></tr>`;
     return;
   }
@@ -1106,6 +1118,11 @@ function renderReport(entry, label) {
 
   resultsCard.style.display = '';
   resultsRunLabel.textContent = label;
+  // Sum of every displayed test's own duration - not the run's real wall-clock
+  // time (tests run sequentially here, so those are close but not identical:
+  // this excludes hook/setup time between tests).
+  const totalDurationMs = relevant.reduce((sum, r) => sum + (r.duration || 0), 0);
+  resultsTotalDuration.textContent = `Total duration: ${formatDuration(totalDurationMs)}`;
   resultsBody.innerHTML = '';
   categorized.forEach((r, i) => {
     const tr = document.createElement('tr');
@@ -1133,6 +1150,7 @@ function renderReport(entry, label) {
 function buildDownloadableReportHtml(entry, projectLabel, projectId) {
   const relevant = scopedResults(projectId, entry);
   const totals = computeTotals(relevant);
+  const totalDurationMs = relevant.reduce((sum, r) => sum + (r.duration || 0), 0);
   const categorized = assignDisplayIds(assignCategoryIds(relevant));
   const rows = categorized.map((r, i) => {
     const statusColor = r.status === 'passed' ? '#1a7f4b' : (r.status === 'failed' || r.status === 'timedOut') ? '#c0392b' : '#64748b';
@@ -1158,6 +1176,8 @@ function buildDownloadableReportHtml(entry, projectLabel, projectId) {
 <style>
   body { font-family: 'Segoe UI', Arial, sans-serif; margin: 30px; color: #1a2233; }
   h1 { font-size: 1.3em; margin-bottom: 4px; }
+  .title-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+  .total-duration { color: #1a2233; font-weight: 700; font-size: 0.85em; white-space: nowrap; }
   .meta { color: #64748b; font-size: 0.9em; margin-bottom: 18px; }
   table { width: 100%; border-collapse: collapse; }
   th, td { padding: 10px 12px; border-bottom: 1px solid #e3e8f0; text-align: left; font-size: 0.9em; vertical-align: top; }
@@ -1166,7 +1186,10 @@ function buildDownloadableReportHtml(entry, projectLabel, projectId) {
   .summary div { background: #f8fafc; border: 1px solid #e3e8f0; border-radius: 8px; padding: 10px 16px; }
 </style></head>
 <body>
-  <h1>${escapeHtml(projectLabel)} — Test Report</h1>
+  <div class="title-row">
+    <h1>${escapeHtml(projectLabel)} — Test Report</h1>
+    <div class="total-duration">Total duration: ${formatDuration(totalDurationMs)}</div>
+  </div>
   <div class="meta">Run ${escapeHtml(entry.runId)} · Generated ${new Date().toLocaleString()}</div>
   <div class="summary">
     <div><strong>${totals.total}</strong> total</div>

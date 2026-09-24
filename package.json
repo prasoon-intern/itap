@@ -8,6 +8,7 @@
     "test:candidate": "npx playwright test tests/Candidate --headed",
     "test:signupsignin": "npx playwright test tests/Candidate/SignUpSignIn.spec.js --headed",
     "test:phase1": "npx playwright test tests/Candidate/Phase1.spec.js --headed",
+    "test:phase1:fast": "set HEADLESS=true&&npx playwright test tests/Candidate/Phase1.spec.js",
     "test:phase2": "npx playwright test tests/Candidate/Phase2.spec.js --headed",
     "test:interview": "npx playwright test tests/Interview tests/Interview.spec.js --headed",
     "test:interview-setup": "npx playwright test tests/Interview/Setup.spec.js --headed",

@@ -34,6 +34,33 @@ class ITAP_LoginPage {
     this.closeModalBtn      = page.locator("div[role='dialog'] button.close");
     this.passwordInfoTrigger = page.locator('.widget-tooltip-trigger').first();
     this.passwordInfoContent = page.locator('.widget-tooltip-content');
+
+    // Confirmed live (2026-09-16): several rejection paths (unchecked
+    // checkbox, duplicate Aadhaar, password-policy violation) don't render
+    // an inline .mx-validation-message at all - they open a SECOND dialog
+    // ("Information") stacked on top of the still-open Sign Up modal itself
+    // (which is also a div[role='dialog']). Filtered by "Information" text,
+    // same pattern as ITAP_AlreadySignedUserPage's own infoDialog, so a bare
+    // .first() here can't accidentally match the signup modal instead.
+    this.infoDialog   = page.locator("div[role='dialog']").filter({ hasText: 'Information' });
+    this.infoDialogOk = this.infoDialog.getByRole('button', { name: 'OK' });
+
+    // Confirmed live (2026-09-16): the Sign Up modal's own header logo is a
+    // DIFFERENT file ("Mankind_logo_new.svg") than the Sign-In page's
+    // ("mankind_logo_dark_big.svg" - see ITAP_AlreadySignedUserPage below),
+    // so a shared case-insensitive "logo" substring match is used instead of
+    // matching either exact filename.
+    this.headerLogo = page.locator('div[role=\'dialog\']').filter({ hasText: 'Sign Up' }).locator('img[src*="logo" i]');
+  }
+
+  /**
+   * Full page's visible text (not just the modal), for checking the fixed
+   * UI copy around the Sign Up modal (its own labels/buttons, plus the
+   * underlying page's header/footer which stay in the DOM behind it) is
+   * present and correctly worded.
+   */
+  async getPageText() {
+    return (await this.page.locator('body').innerText()).trim();
   }
 
   async scrollToFirst() {
@@ -129,6 +156,22 @@ class ITAP_LoginPage {
     await this.page.waitForTimeout(1500);
   }
 
+  /**
+   * Text of the "Information" popup shown after a rejected Sign Up attempt
+   * (unchecked checkbox, duplicate Aadhaar, password-policy violation) -
+   * confirmed live these render as a second dialog stacked on the still-open
+   * Sign Up modal, not an inline .mx-validation-message.
+   */
+  async getInfoDialogText() {
+    await this.infoDialog.waitFor({ state: 'visible', timeout: 10000 });
+    return (await this.infoDialog.innerText()).trim();
+  }
+
+  async closeInfoDialog() {
+    await this.infoDialogOk.click();
+    await this.page.waitForTimeout(300);
+  }
+
   async clickOn_signInToggle() {
     // The modal's resize handle (.mx-resizer) permanently occupies the exact
     // on-screen pixels this link sits at. A plain click times out retrying
@@ -167,6 +210,16 @@ class ITAP_AlreadySignedUserPage {
     this.clickOn_signInButton = page.locator("//*[contains(@data-button-id,'Candidate_Login.actionButton4')]");
     this.forgotPasswordLink   = page.locator("//*[contains(@data-button-id,'Candidate_Login.actionButton1')]");
 
+    // Confirmed live (2026-09-16): a blank/malformed Username or a blank
+    // Password DOES render an inline .mx-validation-message on the Sign-In
+    // form itself (e.g. "Please enter valid Aadhaar number") - this was
+    // previously undocumented here (only the Forgot Password popup's own
+    // messages were, below), and only cases that require a real backend
+    // account lookup (wrong password, unregistered Aadhaar, unchecked
+    // checkbox) show the separate "Information" popup instead (see
+    // infoDialog below).
+    this.validationMessages = page.locator(".mx-validation-message");
+
     // Forgot Password popup (opened by forgotPasswordLink). Scoped to //input
     // rather than a bare //*, for the same reason as ITAP_LoginPage's fields:
     // once "Enter Valid Aadhaar Number" is showing, the error <div> also has
@@ -181,6 +234,22 @@ class ITAP_AlreadySignedUserPage {
     // vs. "Details Not Available!" for an unregistered one).
     this.infoDialog    = page.locator("div[role='dialog']").filter({ hasText: 'Information' });
     this.infoDialogOk  = this.infoDialog.getByRole('button', { name: 'OK' });
+
+    // Confirmed live (2026-09-16): the header logo file is
+    // "mankind_logo_dark_big.svg" here vs. the Sign Up modal's own
+    // "Mankind_logo_new.svg" (see ITAP_LoginPage above) - a shared
+    // case-insensitive "logo" substring match covers both without needing to
+    // match either exact filename.
+    this.headerLogo = page.locator('img[src*="logo" i]');
+  }
+
+  /**
+   * Full page's visible text, for checking the fixed UI copy on the page
+   * (subtitle, field labels, button/link text, footer) is present and
+   * correctly worded.
+   */
+  async getPageText() {
+    return (await this.page.locator('body').innerText()).trim();
   }
 
   async enter_AadharNumber(aadharNumber) {
@@ -198,6 +267,31 @@ class ITAP_AlreadySignedUserPage {
   async clickOn_SignInButton() {
     await this.clickOn_signInButton.scrollIntoViewIfNeeded();
     await this.clickOn_signInButton.click();
+  }
+
+  /**
+   * Unique, non-empty inline validation messages currently visible on the
+   * Sign-In form itself (e.g. a blank/malformed Username or blank Password).
+   */
+  async getVisibleValidationMessages() {
+    const texts = await this.validationMessages.allTextContents();
+    return [...new Set(texts.map((t) => t.trim()).filter(Boolean))];
+  }
+
+  /**
+   * Text of the "Information" popup Mendix shows for rejections that need a
+   * real backend account lookup (unchecked checkbox, unregistered Aadhaar,
+   * wrong password) - distinct from getVisibleValidationMessages() above,
+   * which only covers this form's own field-shape checks.
+   */
+  async getInfoDialogText() {
+    await this.infoDialog.waitFor({ state: 'visible', timeout: 10000 });
+    return (await this.infoDialog.innerText()).trim();
+  }
+
+  async closeInfoDialog() {
+    await this.infoDialogOk.click();
+    await this.page.waitForTimeout(300);
   }
 
   /**

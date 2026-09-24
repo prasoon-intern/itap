@@ -4,17 +4,26 @@
 // Details + Document Upload). Reused by tests/Candidate/Phase1.spec.js and
 // tests/Candidate/Phase2.spec.js so the field timing only lives in one place.
 //
-// The hardWait() calls between steps are not decorative: Mendix's reactive
-// widgets (HQ reference selector, HQ Flexible radio, state/district
-// selectors) need settle time after each interaction. Omitting them
-// (confirmed live) makes the next locator's own auto-wait swallow the full
-// remaining test timeout instead of finding the element, since the element
-// simply isn't rendered yet.
+// The waits between steps are not decorative: Mendix's reactive widgets (HQ
+// reference selector, HQ Flexible radio, state/district selectors) need
+// settle time after each interaction. Omitting them entirely (confirmed
+// live) makes the next locator's own auto-wait swallow the full remaining
+// test timeout instead of finding the element, since the element simply
+// isn't rendered yet.
+//
+// fillValidPersonalDetails() below no longer uses fixed hardWait() sleeps
+// for this - it waits on the real signal (the DOM going quiet) via
+// utils/MendixSettle.js's settle(). Measured live 2026-09-18: the fixed
+// sleeps in that one function totalled ~52s, paid by 32 of the 51 Phase 1
+// test cases. Every OTHER helper in this file still uses hardWait() exactly
+// as before - Phase 2's specs depend on them and were not re-verified as
+// part of that change.
 const path = require('path');
-const { ITAP_LoginPage } = require('../pages/Candidate/SignUpSignIn');
+const { ITAP_LoginPage, ITAP_AlreadySignedUserPage } = require('../pages/Candidate/SignUpSignIn');
 const { ITAPInterviewPerformaPage, ITAP_QualificationDetailsPage, ITAP_ExperienceDetailPage } = require('../pages/Candidate/Phase1');
 const { ITAP_ContinueToPhase2Page } = require('../pages/Candidate/Phase2');
 const config = require('../config');
+const { settle, settleAsHardWait } = require('./MendixSettle');
 
 function getRandomAadhar() {
   const first = Math.floor(1 + Math.random() * 9).toString();
@@ -37,17 +46,51 @@ async function signupAndReachPhase1(bf) {
   await lp.validateHomePageTitle();
 }
 
+// SIGNS IN (not up) as an already-registered candidate and lands on Phase 1
+// — a much shorter flow than signupAndReachPhase1() above, for tests that
+// don't need a genuinely fresh/untouched account. Safe to call repeatedly
+// against the same pooled candidate (see utils/Phase1TestCandidates.js's own
+// comment for the live-confirmed safety reasoning: a Next click blocked by
+// validation never persists any data server-side) — NOT safe for a test that
+// completes a full, valid submission, which needs a real fresh account via
+// signupAndReachPhase1() instead. Follows the exact same fresh-
+// BrowserFactory-per-test pattern as signupAndReachPhase1() (no
+// {shared: true}) — only the sign-up-vs-sign-in step itself differs.
+async function signInAndReachPhase1(bf, candidate) {
+  const login = new ITAP_AlreadySignedUserPage(bf.page);
+  await login.enter_AadharNumber(candidate.aadhaar);
+  await login.enter_Password(candidate.password);
+  await login.clickOn_radioButton();
+  await login.clickOn_SignInButton();
+  await login.validateSignInSuccess();
+}
+
 // Fills every Personal Details field with known-valid data, except whatever
 // is overridden — isolates the one field under test from unrelated
 // "required field missing" noise on the other fields. Does not click Next.
+//
+// overrides.lastName / .skipHQPreference / .skipGender / .skipMaritalStatus /
+// .fatherOcc / .fatherIncome / .motherName / .motherOcc / .motherIncome /
+// .city / .skipState / .skipDistrict are new (2026-09-17), added for the
+// Candidate Application Form (Phase 1) 51-test-case suite's per-field
+// mandatory/negative coverage — every existing override key keeps its exact
+// previous behavior.
 async function fillValidPersonalDetails(itapPage1, bf, overrides = {}) {
-  await itapPage1.enter_FirstName(overrides.firstName || bf.getPropertyValue('FirstName'));
+  // Was `overrides.firstName || default` — a falsy-string bug: passing ''
+  // (the whole point of the "First Name is mandatory" negative test) fell
+  // through to the default instead of actually leaving the field blank.
+  await itapPage1.enter_FirstName(overrides.firstName !== undefined ? overrides.firstName : bf.getPropertyValue('FirstName'));
   await itapPage1.enter_MiddleName(bf.getPropertyValue('MiddleName'));
-  await itapPage1.enter_LastName(bf.getPropertyValue('LastName'));
-  await bf.hardWait(4);
+  await itapPage1.enter_LastName(overrides.lastName !== undefined ? overrides.lastName : bf.getPropertyValue('LastName'));
+  await settle(bf);
   await itapPage1.select_Role(bf.getPropertyValue('Role'));
-  await itapPage1.select_HQ(bf.getPropertyValue('HQPreference'));
-  await bf.hardWait(4);
+  // overrides.skipHQPreference === true: leaves the HQ Preference reference
+  // selector unselected, for the "HQ Preference is mandatory" negative test
+  // — every other call site never sets this and keeps selecting it as before.
+  if (overrides.skipHQPreference !== true) {
+    await itapPage1.select_HQ(bf.getPropertyValue('HQPreference'));
+  }
+  await settle(bf);
   // overrides.hqFlexible === false: TC-P0x exercises the "HQ Not Flexible"
   // radio, which every other call site never touches (defaults preserve
   // that existing behavior exactly).
@@ -56,19 +99,35 @@ async function fillValidPersonalDetails(itapPage1, bf, overrides = {}) {
   } else {
     await itapPage1.select_HQFlexible();
   }
-  await bf.hardWait(4);
+  await settle(bf);
   await itapPage1.fill_ContactDetails(overrides.pan, overrides.mobile);
-  await bf.hardWait(4);
-  await itapPage1.select_Gender();
-  await bf.hardWait(5);
-  await itapPage1.fill_PersonalDetails(overrides.dob);
-  await bf.hardWait(5);
-  await itapPage1.fill_ParentDetails(overrides.fatherName);
-  await bf.hardWait(5);
-  await itapPage1.fill_Address(overrides.addressLine1, undefined, overrides.pin);
-  await bf.hardWait(5);
-  await itapPage1.select_StateDistrict(bf.hardWait.bind(bf));
-  await bf.hardWait(4);
+  await settle(bf);
+  // overrides.skipGender === true: leaves Gender unselected, for the
+  // "Gender is mandatory" negative test.
+  if (overrides.skipGender !== true) {
+    await itapPage1.select_Gender();
+  }
+  await settle(bf);
+  await itapPage1.fill_PersonalDetails(overrides.dob, overrides.skipMaritalStatus !== true);
+  await settle(bf);
+  await itapPage1.fill_ParentDetails(
+    overrides.fatherName,
+    overrides.fatherOcc,
+    overrides.fatherIncome,
+    overrides.motherName,
+    overrides.motherOcc,
+    overrides.motherIncome,
+  );
+  await settle(bf);
+  await itapPage1.fill_Address(overrides.addressLine1, overrides.city, overrides.pin);
+  await settle(bf);
+  // overrides.skipState === true: leaves State (and therefore District too
+  // — District has no real options until a State is chosen) unselected, for
+  // the "State is mandatory" negative test. overrides.skipDistrict === true
+  // (with State still selected): leaves only District unselected, for the
+  // "District is mandatory" negative test.
+  await itapPage1.select_StateDistrict(settleAsHardWait(bf), overrides.skipState !== true, overrides.skipDistrict !== true);
+  await settle(bf);
   // overrides.sameAsPermanentAddress === false: leaves the Current Address
   // section blank/unchecked instead of auto-copying the Permanent Address
   // into it, so a caller can inspect that section on its own (its own
@@ -77,26 +136,68 @@ async function fillValidPersonalDetails(itapPage1, bf, overrides = {}) {
   // original unconditional-check behavior exactly.
   if (overrides.sameAsPermanentAddress !== false) {
     await itapPage1.click_PerAddRadioBtn();
-    await bf.hardWait(3);
+    await settle(bf);
   }
   await itapPage1.select_vehicleNum_yes(overrides.vehicleNumber);
-  await bf.hardWait(3);
+  await settle(bf);
   if (overrides.interviewDate) {
     await itapPage1.select_InterviewDate(overrides.interviewDate);
   } else {
     await itapPage1.select_No_InterviewDate();
   }
-  await bf.hardWait(3);
+  await settle(bf);
 }
 
 // Fills every Qualification Details field with known-valid data, except
 // whatever is overridden. Does not click Next.
+//
+// overrides.skipXth / .skipXII === true are new (2026-09-22), added for the
+// Qualification Details 41-test-case suite (TC_51-91): leaves that whole
+// section untouched (both are optional - see Phase1.spec.js's own comment on
+// why 10th/12th being left blank TOGETHER is safe, but partially filling one
+// while leaving the other blank triggers a cross-field "Enter To and From
+// dates for 10th and 12th" validation message - confirmed live 2026-09-22).
+// Every other override key is passed straight through to the page object's
+// own fill_XthDetails/fill_XIIthDetails/fill_graduationDetails, whose
+// signatures already default to the same valid values this function
+// previously hardcoded via `overrides.xthFrom` etc. being undefined.
 async function fillValidQualification(itapPage2, bf, overrides = {}) {
-  await itapPage2.fill_XthDetails(overrides.xthFrom, overrides.xthTo, overrides.xthMarks);
-  await bf.hardWait(2);
-  await itapPage2.fill_XIIthDetails(overrides.xiiFrom, overrides.xiiTo, overrides.xiiMarks);
-  await bf.hardWait(2);
-  await itapPage2.fill_graduationDetails(overrides.gradFrom, overrides.gradTo, overrides.gradMarks);
+  if (overrides.skipXth !== true) {
+    await itapPage2.fill_XthDetails(overrides.xthFrom, overrides.xthTo, overrides.xthMarks, overrides.xthSpecialization);
+    await bf.hardWait(2);
+  } else {
+    // See clear_XthDetails()'s own comment: actively blanks the section
+    // instead of just not touching it, since the pooled candidate can carry
+    // in stale data from an earlier test.
+    await itapPage2.clear_XthDetails();
+    await bf.hardWait(2);
+  }
+  if (overrides.skipXII !== true) {
+    await itapPage2.fill_XIIthDetails(overrides.xiiFrom, overrides.xiiTo, overrides.xiiMarks, overrides.xiiSpecialization);
+    await bf.hardWait(2);
+  } else {
+    await itapPage2.clear_XIIthDetails();
+    await bf.hardWait(2);
+  }
+  // overrides.gradOmit is new (2026-09-23), added for the Graduation
+  // mandatory-field negative tests (TC_66-TC_70): fills Graduation validly
+  // except for the one named field, which is actively cleared (see
+  // fill_graduationDetailsOmitting()'s own comment for why clearing rather
+  // than skipping is required against the pooled candidate). Left undefined
+  // — as every pre-existing caller does — this branch is never taken and
+  // behavior is byte-for-byte what it was before.
+  if (overrides.gradOmit) {
+    await itapPage2.fill_graduationDetailsOmitting(overrides.gradOmit, {
+      fromDate: overrides.gradFrom, toDate: overrides.gradTo, marks: overrides.gradMarks,
+      course: overrides.gradCourse, type: overrides.gradType,
+      specialization: overrides.gradSpecialization,
+    });
+  } else {
+    await itapPage2.fill_graduationDetails(
+      overrides.gradFrom, overrides.gradTo, overrides.gradMarks,
+      overrides.gradCourse, overrides.gradType, overrides.gradSpecialization,
+    );
+  }
   await bf.hardWait(2);
 }
 
@@ -248,6 +349,7 @@ async function reachPhase2Uploads(bf) {
 module.exports = {
   getRandomAadhar,
   signupAndReachPhase1,
+  signInAndReachPhase1,
   fillValidPersonalDetails,
   fillValidQualification,
   VALID_DOC_SLOTS,
