@@ -28,7 +28,9 @@ Agri 10039037 · Alpha 10019233
 ## Completed modules — STABLE, do not modify without explicit new instruction
 - **Manager Referral** — 71 tests. `tests/ManagerReferral/Page.spec.js` + `Report.spec.js`.
   Source: `Test Cases/ManagerReferral_TestCases.xlsx`. Uses `BrowserFactory`'s
-  shared-session pattern (`{shared:true}` + `resetForNextTest()`).
+  shared-session pattern (`{shared:true}` + `resetForNextTest()`). 1 test (TC_16, Report
+  sheet) is Pending, deferred — "Initital feedback" data doesn't exist yet; documented
+  in Actual with a `(Deferred - ...)` bracketed reason so it can be found again later.
 - **Candidate Sign In & Sign Up** — 48 tests. `tests/Candidate/SignIn.spec.js` +
   `SignUp.spec.js`. Source: `Test Cases/candidateSignInSignUp.xlsx`. Also shared-session.
 - **Candidate Application Form — Phase 1** — 119 tests, fully live-verified.
@@ -37,18 +39,48 @@ Agri 10039037 · Alpha 10019233
   documented, live-confirmed app defect with a Priority (P1-P3) in the workbook's 11th
   column ("Priority"), the user's own ruling per case, not inferred from similar ones.
   `pages/Candidate/Phase1.js` and the Phase-1-relevant parts of
-  `utils/CandidateFlowHelpers.js` are SHARED with Phase 2 (below) — stable, but expect
-  to extend them additively (not rewrite) when Phase 2 resumes.
+  `utils/CandidateFlowHelpers.js` are SHARED with Phase 2 — stable, extended additively.
+- **Candidate Application Form — Phase 2** — 96 tests, fully live-verified, both
+  subsections ("1. Other Details" and "2. Upload Documents") done. `tests/Candidate/
+  Phase2.spec.js` (rewritten from scratch 2026-09-25 — the pre-existing legacy suite
+  there was set aside on the user's instruction). Source: same workbook, sheet `Phase2`.
+  Result: 88 Passed / 6 Failed (all prioritized: TC_86 P1, TC_92 P2, TC_10/TC_35/TC_60/
+  TC_74 P3) / 2 Pending (TC_49 — YouTube blocked on this network; TC_91 — drag-and-drop
+  needs a CDP-level technique, deferred; both documented in Actual with a bracketed
+  reason). New supporting files: `pages/Candidate/Phase2OtherDetails.js` (classes
+  `ITAP_Phase2OtherDetailsPage` and `ITAP_Phase2UploadDocumentsPage` — kept separate from
+  the legacy `pages/Candidate/Phase2.js`, which `CandidateFlowHelpers.js` and
+  `createFreshInterviewCandidate.js` still use), `utils/Phase2TestCandidates.js` (the
+  account pool, see below).
+  **Account pool for Phase 2** (`utils/Phase2TestCandidates.js`) — reusable pooled
+  accounts, all password `config.NewPassword`: `single`/`married`/`divorced`/`widowed`/
+  `other` (Phase 1 done, vary by Marital Status), `fresher` (experienced=No, Other
+  Details only), `fresherUploads` (experienced=No, already past a successful Other
+  Details Next — reserved for Upload Documents), `deceasedDependent` (Father marked
+  deceased — reserved for deceased-dependent checks only, incompatible with tests
+  assuming 2 ordinary rows). CRITICAL: a **successful** Next on Other Details SAVES data
+  permanently server-side and advances the account past Other Details (confirmed live)
+  — never click a genuinely valid Next + Submit on `single`/`fresher`/`married`/`widowed`/
+  `other`. `divorced` and `fresherUploads` already had this done deliberately (for TC_62
+  and Upload Documents work respectively) and are safe to reuse for anything short of a
+  real Submit. Any test needing an actual completed Submit (TC_89) MUST use a fresh,
+  single-use, disposable account, created inline, never added to the pool, never reused.
+  `utils/upload-files/` — moved from the project root into `utils/` (2026-09-28, user
+  request); `CandidateFlowHelpers.js` and `createFreshInterviewCandidate.js` were updated
+  to the new `__dirname`-based path. Has 2 valid files per document type (for the 2-file-
+  cap tests), plus format/size/filename edge cases (`invalid-type.gif`, `exactly5mb.jpg`,
+  `oversized.jpg`, `test.pdf`, `salarySlip.png`).
 
 **Files off-limits** without being asked again: `tests/ManagerReferral/`,
 `pages/ManagerReferral/`, `Test Cases/ManagerReferral_TestCases.xlsx`,
 `tests/Candidate/SignIn.spec.js`, `tests/Candidate/SignUp.spec.js`,
 `pages/Candidate/SignUpSignIn.js`, `Test Cases/candidateSignInSignUp.xlsx`,
-`utils/SampleCandidate.js`, `tests/Candidate/Phase1.spec.js`.
+`utils/SampleCandidate.js`, `tests/Candidate/Phase1.spec.js`,
+`tests/Candidate/Phase2.spec.js`, `pages/Candidate/Phase2OtherDetails.js`,
+`utils/Phase2TestCandidates.js`.
 
 ## Currently in progress / not yet started — will follow the same pattern as the completed modules above
 
-- **Candidate Application Form (Phase 2)** — deferred, not started.
 - **FC Admin Interview** — not started. Legacy Excel/automation already exists
   (`Test Cases/Fc_admin interview.xlsx`, `pages/Interview.js` + `pages/Interview/`,
   `tests/Interview.spec.js` + `tests/Interview/*.spec.js`) — don't assume it should be
@@ -127,3 +159,59 @@ checkout) — unclear origin, worth checking/cleaning up at some point.
 - A field that's normally located via its placeholder can lose that placeholder when the
   app disables it (seen on Experience Details' "To" date) — prefer a stable id-based
   locator over a placeholder/index-based one for any field that has a disabled state.
+- A **successful** Next (unlike a blocked one) DOES persist data server-side and
+  permanently advances the account (confirmed live for Phase 2's Other Details → Upload
+  Documents transition, and for a real Submit). Any test that needs this MUST run on a
+  dedicated spare/disposable account, never a pooled account other tests still rely on.
+- Mendix's file-upload widget (`filedropper` BEM classes: `.filedropper`,
+  `.filedropper__dropzone`, `.filedropper__list`, `.filedropper__alerts`,
+  `.filedropper__item`, `.filedropper__button-zone__button` for delete) does NOT sit
+  directly next to its field's text label in the DOM — locating it via `nth(i)`
+  positional indices is fragile because uploading a file can shift every later index
+  (confirmed live: total file-input count changes as slots fill/empty). Climb from the
+  label element to the nearest ancestor containing `.filedropper` instead (see
+  `pages/Candidate/Phase2OtherDetails.js`'s `fieldContainer()`/`uploadInto()` and this
+  session's own `labelToDropzoneHandle()` probe pattern) — stable regardless of DOM
+  reordering. A `.filedropper` field caps at 2 files (Experience Documents: 10); once
+  capped, its `<input type=file>` disappears entirely rather than showing an error.
+- Playwright element handles can go stale mid-script when a Mendix widget re-renders
+  after an interaction (e.g. a progress-bar animation completing) — a handle captured
+  before that point throws "Element is not attached to the DOM" on the next action.
+  Prefer doing the click *inside* a single `page.evaluate()`/`elementHandle.evaluate()`
+  call (query + click in the same browser-side execution) over holding a Playwright
+  handle across an `await` boundary.
+- The "Click Here To See Document Upload Instructions" link does not fire a Playwright
+  `download` event — it opens a new tab that navigates directly to a Mendix `/file?
+  guid=...` URL (Chromium renders the PDF inline). To fetch it programmatically, capture
+  that URL from the `page` popup event, then use `context.request.get(url)` (reuses the
+  authenticated session's cookies) to get the raw bytes. `pdf-parse` (v2, added as a
+  devDependency 2026-09-28) parses it: `new PDFParse({ data: buffer })`, then
+  `.getText()` for per-page text and `.getImage()` for embedded image/screenshot counts.
+- Simulating drag-and-drop file upload via synthetic DOM events (`dragenter`/`dragover`/
+  `drop` with a manually-built `DataTransfer`) did NOT register on this React-based
+  widget — likely needs a genuinely browser-trusted gesture (Chrome DevTools Protocol's
+  `Input.dispatchDragEvent`), not yet implemented. Left as a known gap (see Phase 2's
+  TC_91) rather than forcing an unreliable workaround.
+- When documenting why a test case is Pending (blocked/deferred, not yet run), record
+  the reason directly in the Actual column, right after "Not yet automated.", in a
+  bracketed note — e.g. `Not yet automated. (Blocked: ...)` or `(Deferred: ...)` — so it
+  can be found and revisited later once whatever's blocking it is resolved.
+- **Standing convention (2026-09-28):** every Pending test case must ALSO have a real
+  `test()` stub in its spec file using `test.skip(true, '<reason>')` — the inside-body
+  form, not the `test.skip(title, body)` modifier — with the reason text matching
+  Excel's bracketed note (drop the "Not yet automated." prefix, just the reason itself).
+  `server.js`'s `finalizeRun` already reads `test.annotations[].description` for a
+  skipped test and shows it in the dashboard's Reason column instead of a generic
+  "Skipped (no reason given)"; Playwright's own native HTML report picks up the same
+  annotation automatically, no separate work needed for that surface. See TC_16
+  (`tests/ManagerReferral/Report.spec.js`), TC_49/TC_91
+  (`tests/Candidate/Phase2.spec.js`) for the pattern. Do this at the same time a test is
+  marked Pending, not as a later cleanup pass — keeps Excel and the dashboard/report
+  from drifting out of sync.
+- When estimated automation time looks too high, look for real ways to cut it before
+  just accepting the estimate: pre-solve the genuinely novel technical pieces directly
+  yourself (a few minutes of focused probing) rather than paying a full agent-delegation
+  research tax for each one, recheck whether a "needs its own fresh account" test can
+  actually be proven safely without completing the risky action (e.g. double-click-
+  Submit only needs proving one dialog appears, not a real Yes), and combine tests that
+  share the same setup into one continuous session instead of re-doing setup per test.

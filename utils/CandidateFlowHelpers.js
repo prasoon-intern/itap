@@ -31,12 +31,16 @@ function getRandomAadhar() {
   return `${first}${rest}`;
 }
 
-async function signupAndReachPhase1(bf) {
+// `aadhaar` (new 2026-09-25, optional): lets a one-time setup script sign up
+// with an Aadhaar it already knows, so the account can be recorded and signed
+// back into later. Omitted (every pre-existing caller) a random one is used,
+// exactly as before.
+async function signupAndReachPhase1(bf, aadhaar = getRandomAadhar()) {
   const lp = new ITAP_LoginPage(bf.page);
   await lp.scrollToFirst();
   await lp.clickOn_createNewOne();
   await bf.hardWait(1);
-  await lp.enterAadhaarNumber(getRandomAadhar());
+  await lp.enterAadhaarNumber(aadhaar);
   await lp.enter_emailId(config.PersonalEmailId);
   await lp.enter_newPassword(config.NewPassword);
   await lp.enter_confirmPassword(config.ConfirmPassword);
@@ -63,6 +67,24 @@ async function signInAndReachPhase1(bf, candidate) {
   await login.clickOn_radioButton();
   await login.clickOn_SignInButton();
   await login.validateSignInSuccess();
+}
+
+// Phase 2 counterpart of signInAndReachPhase1() above (new 2026-09-25,
+// purely additive). An account that has already submitted Phase 1 lands
+// DIRECTLY on Phase 2 "1. Other Details" on sign-in - confirmed live
+// 2026-09-25 at ~11s, versus ~111s for signup + all of Phase 1 + "Continue
+// to Phase 2". validateSignInSuccess() can't be reused here (it asserts the
+// Phase 1 title), so this waits on the Phase 2 title and the Blood Group
+// <select> actually rendering instead.
+async function signInAndReachPhase2(bf, candidate) {
+  const login = new ITAP_AlreadySignedUserPage(bf.page);
+  await login.enter_AadharNumber(candidate.aadhaar);
+  await login.enter_Password(candidate.password);
+  await login.clickOn_radioButton();
+  await login.clickOn_SignInButton();
+  await bf.page.waitForFunction(() => document.title.includes('Application Form - Phase 2'), undefined, { timeout: 30000 });
+  await bf.page.locator("select[id*='Snip_OtherDetails.dropDown1']").first().waitFor({ state: 'visible', timeout: 20000 });
+  await settle(bf);
 }
 
 // Fills every Personal Details field with known-valid data, except whatever
@@ -108,7 +130,11 @@ async function fillValidPersonalDetails(itapPage1, bf, overrides = {}) {
     await itapPage1.select_Gender();
   }
   await settle(bf);
-  await itapPage1.fill_PersonalDetails(overrides.dob, overrides.skipMaritalStatus !== true);
+  // overrides.maritalStatus (new 2026-09-25): 'Single' | 'Married' |
+  // 'Divorced' | 'Widowed' | 'Other' - selects that exact option. Left
+  // undefined (every pre-existing caller) the old ArrowDown+Enter default
+  // runs unchanged.
+  await itapPage1.fill_PersonalDetails(overrides.dob, overrides.skipMaritalStatus !== true, overrides.maritalStatus);
   await settle(bf);
   await itapPage1.fill_ParentDetails(
     overrides.fatherName,
@@ -208,7 +234,12 @@ async function fillValidQualification(itapPage2, bf, overrides = {}) {
 // the exact same flow logic instead of re-implementing it, mirroring how
 // utils/createClearedOnboardingCandidate.js builds on
 // utils/createFreshInterviewCandidate.js rather than duplicating it.
-const filesDir = path.join('upload-files');
+// upload-files/ moved from the project root into utils/ (2026-09-25, user
+// request, purely a relocation) - __dirname-based so this keeps resolving
+// correctly regardless of the process's current working directory (the old
+// bare 'upload-files' relied on cwd == project root, which happened to be
+// true only because the folder used to live there too).
+const filesDir = path.join(__dirname, 'upload-files');
 
 // Slot order matches the "experience === yes" branch in
 // utils/createFreshInterviewCandidate.js.
@@ -350,6 +381,7 @@ module.exports = {
   getRandomAadhar,
   signupAndReachPhase1,
   signInAndReachPhase1,
+  signInAndReachPhase2,
   fillValidPersonalDetails,
   fillValidQualification,
   VALID_DOC_SLOTS,

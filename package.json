@@ -27,7 +27,8 @@
     "dashboard": "node server.js"
   },
   "devDependencies": {
-    "@playwright/test": "^1.44.0"
+    "@playwright/test": "^1.44.0",
+    "pdf-parse": "^2.4.5"
   },
   "dependencies": {
     "child_process": "^1.0.2",

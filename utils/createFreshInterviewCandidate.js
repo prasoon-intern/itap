@@ -75,7 +75,10 @@ async function createFreshInterviewCandidate() {
   const itapPage2 = new ITAP_QualificationDetailsPage(bf.page);
   const itapPage3 = new ITAP_ExperienceDetailPage(bf.page);
   const itap_Phase2Page = new ITAP_ContinueToPhase2Page(bf.page);
-  const filesDir = path.join(__dirname, '..', 'upload-files');
+  // upload-files/ moved from the project root into utils/ (2026-09-25, user
+  // request, purely a relocation) - this file already lives in utils/, so it
+  // is now a sibling folder rather than one level up.
+  const filesDir = path.join(__dirname, 'upload-files');
 
   try {
     // -- Signup --

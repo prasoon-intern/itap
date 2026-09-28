@@ -269,16 +269,20 @@ test.describe('Manager Referral Report - Grid Filters & Pagination', () => {
   });
 
   // Excel TC_16 - deferred in the workbook itself: "Initital feedback data
-  // does not exist yet; will be tested later per instruction." Uses the
-  // inside-body test.skip(condition, description) form (not the
-  // test.skip(title, body) modifier) specifically so that description
+  // does not exist yet; will be tested later once initial feedback data
+  // comes." Uses the inside-body test.skip(condition, description) form (not
+  // the test.skip(title, body) modifier) specifically so that description
   // reaches Playwright's own skip annotation - server.js's finalizeRun
   // already reads test.annotations[].description for a skipped test's
-  // reason, so this alone is what makes the dashboard's Reason column show
-  // "Pending" instead of falling back to its generic "Skipped (no reason
-  // given)" text.
+  // reason, so this alone is what makes the dashboard's Reason column (and
+  // the native Playwright HTML report) show the real blocking reason instead
+  // of falling back to its generic "Skipped (no reason given)" text.
+  // STANDING CONVENTION (2026-09-28): whenever a test case is left Pending
+  // in Excel with a documented reason, add/update the matching
+  // test.skip(true, '<same reason>') stub here so Excel and the
+  // dashboard/report always stay in sync - see project_context.md.
   test('TC_16: the Initial feedback column filter works correctly', async () => {
-    test.skip(true, 'Pending');
+    test.skip(true, 'Deferred - Initital feedback data does not exist yet; will be tested later once initial feedback data comes');
   });
 
   // Excel TC_17

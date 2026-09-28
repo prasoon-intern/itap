@@ -66,11 +66,10 @@ const PROJECTS = {
         sidebarLabel: "Candidate Application Form<br>Phase 1 & Phase 2",
         description: "Personal Details, Qualification, Experience Details, and Document Upload coverage — happy-path plus negative/edge cases.",
         dir: __dirname,
-        // Phase 2 is deferred (user, 2026-09-18: "not working on phase 2 right
-        // now") - temporarily excluded from the dashboard so its legacy tests
-        // don't show up alongside Phase 1's real, verified ones. Re-add
-        // `|| t.file === "Candidate/Phase2.spec.js"` when Phase 2 reopens.
-        testFilter: (t) => t.file === "Candidate/Phase1.spec.js",
+        // Phase 2 was deferred 2026-09-18 and hidden here; reopened
+        // 2026-09-24/25. Phase2.spec.js was rewritten from scratch (the
+        // legacy suite was dropped), so it is back on the dashboard.
+        testFilter: (t) => t.file === "Candidate/Phase1.spec.js" || t.file === "Candidate/Phase2.spec.js",
     },
     referral: {
         id: "referral",

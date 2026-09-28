@@ -235,11 +235,21 @@ class ITAPInterviewPerformaPage {
   // leaving the native <select> on its blank default value - used by the
   // "Marital Status is mandatory" negative test, which needs DOB (and every
   // other field) validly filled while only Marital Status stays blank.
-  async fill_PersonalDetails(dob = '2/2/1993', selectMaritalStatus = true) {
+  //
+  // maritalStatusLabel (new 2026-09-25, optional, default undefined so every
+  // existing caller is unaffected): picks that exact Marital Status option
+  // by its visible label ('Single' | 'Married' | 'Divorced' | 'Widowed' |
+  // 'Other') instead of the ArrowDown+Enter default (which lands on
+  // 'Single'). Added for the Phase 2 Date Of Marriage branch accounts.
+  async fill_PersonalDetails(dob = '2/2/1993', selectMaritalStatus = true, maritalStatusLabel) {
     await this.DOB.scrollIntoViewIfNeeded();
     await this.DOB.fill(dob);
     if (!selectMaritalStatus) return;
     await this.maritalStatus.scrollIntoViewIfNeeded();
+    if (maritalStatusLabel) {
+      await this.maritalStatus.selectOption({ label: maritalStatusLabel });
+      return;
+    }
     await this.maritalStatus.click();
     await this.page.keyboard.press('ArrowDown');
     await this.page.keyboard.press('Enter');
