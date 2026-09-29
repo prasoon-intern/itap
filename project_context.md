@@ -215,3 +215,54 @@ checkout) — unclear origin, worth checking/cleaning up at some point.
   actually be proven safely without completing the risky action (e.g. double-click-
   Submit only needs proving one dialog appears, not a real Yes), and combine tests that
   share the same setup into one continuous session instead of re-doing setup per test.
+
+## Dashboard feature: email notification on run completion (added 2026-09-29)
+
+An opt-in checkbox on the dashboard ("Email me when this run finishes", in the
+per-module `header-actions` row, currently only wired to the single-module "Run All"
+path — NOT yet wired to "Run Everything"/`/api/run-full-suite`, which itself isn't a
+built feature yet per the user). When checked, its state flows through
+`/api/run-tests`'s `notifyByEmail` body field → `startProjectRun()`'s 4th
+parameter → stored on `currentRun.notifyByEmail` → read in `finalizeRun()` once the
+run completes, which then (fire-and-forget, never blocking `run-complete`'s own
+broadcast, and never able to affect the run's own recorded results — errors are
+caught and only logged) renders and emails the report.
+
+**Key design choice — don't reimplement the report logic, reuse it live:** rather than
+porting `buildDownloadableReportHtml()` (automation-dashboard.html) and its whole
+dependency chain (`assignCategoryIds`, `friendlyReason`, `classifyTest`, etc. — all
+client-only) to Node, `renderReportToPdf()` in `server.js` launches a headless
+Chromium (`playwright`'s `chromium`, already a project dependency), loads the real
+running dashboard at `http://localhost:3000/automation-dashboard`, and calls
+`buildDownloadableReportHtml()` directly via `page.evaluate()` to get the exact same
+HTML the "Download Report" button would produce — then prints THAT to PDF via
+`page.pdf()`. Zero duplicated logic, guaranteed always pixel-identical to what a human
+downloading the report manually would see, no maintenance burden of keeping two copies
+in sync.
+
+**Email routing — confirmed live 2026-09-29, do not assume the "obvious" direction
+works:** sender = personal Gmail (`PERSONAL_GMAIL_ADDRESS`/`PERSONAL_GMAIL_APP_PASSWORD`
+in `.env`, an App Password from https://myaccount.google.com/apppasswords, requires
+2-Step Verification), recipient = company email (`COMPANY_EMAIL_ADDRESS` in `.env`).
+Sending FROM the company Outlook/365 account was tried FIRST (matching the user's
+initial preference) and is a confirmed dead end — no "App passwords" option exists on
+that account's Microsoft security-info page at all, meaning the org's IT has disabled
+legacy/basic SMTP auth for the tenant; this cannot be fixed from the user's side, only
+an Exchange admin could enable it. `verify-gmail-smtp.js` (kept, standalone, not part
+of the real feature) is a quick sanity-check tool for this path if it ever needs
+re-diagnosing later, independent of the full dashboard.
+
+**Credentials:** `.env` (gitignored, real values only entered directly by the user in
+their own editor — NEVER pasted into a Claude Code conversation, even by a trusted
+user, since a chat message becomes part of the session transcript/log permanently in a
+way a local file edit does not). `.env.example` (committed) is the template. Real `.env`
+is never read by Claude Code either, by deliberate choice — the user verifies its
+contents themselves via `Get-Content .env` / the IDE, and shares back only non-secret
+confirmations (e.g. "the email address looks right") when troubleshooting.
+
+**Known gotcha that cost real debugging time:** IDE edits to `.env` that aren't
+explicitly saved (Ctrl+S) leave the on-disk file — and therefore whatever
+`dotenv.config()` actually loads — showing stale/placeholder content, even though the
+IDE's own buffer shows the "correct" typed values. Always confirm via `Get-Content
+.env` (or equivalent) that the SAVED file has real values before assuming a credential
+problem is anything deeper than an unsaved edit.

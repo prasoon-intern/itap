@@ -1,23 +1,31 @@
-# Candidate Onboarding & Appointment Module — Playwright JS
+# ITAP Automation — Playwright JS
 
-Playwright Test suite covering the Mendix candidate onboarding flow
-(`p/candidatelogin`) and the FC Admin appointment/interview/training flows.
+Playwright Test suite covering the Mendix candidate recruitment flow
+(`p/candidatelogin`: Manager Referral, Sign In & Sign Up, Application Form
+Phase 1 & Phase 2) and the FC Admin appointment/interview/training flows.
+Every module's test cases are first built as an Excel workbook under
+`Test Cases/` (source of truth), then automated as Playwright specs
+traceable back to it via `// Excel TC_XX` comments — see `project_context.md`
+for the full established workflow, per-module status, and technical lessons.
 
 ## Project Structure
 
-The dashboard has 6 modules. **Candidate**, **Interview**, and **Onboarding**
-are split into one file per test cluster, each with its own matching
-page-object file, grouped under a subfolder in both `pages/` and `tests/`.
-**Training** and **Open Training** currently each get one page-object file +
-one spec file. **HR** (2026-09-08) holds only Document Verification so far —
-it was split out of Onboarding into its own module since it's a distinct
-HR-only portal, not an FC Admin page.
+**Manager Referral, Candidate, Interview**, and **Onboarding** are split into
+one file per test cluster, each with its own matching page-object file,
+grouped under a subfolder in both `pages/` and `tests/`. **Training** and
+**Open Training** currently each get one page-object file + one spec file.
+**HR** (2026-09-08) holds only Document Verification so far — it was split
+out of Onboarding into its own module since it's a distinct HR-only portal,
+not an FC Admin page.
 
 | Module | Page object(s) | Spec file(s) | Covers | Status |
 |---|---|---|---|---|
-| Candidate — Signup & Sign-In | `pages/Candidate/SignUpSignIn.js` | `tests/Candidate/SignUpSignIn.spec.js` | Candidate signup modal, sign-in, Forgot Password | ✅ Validated |
-| Candidate — Phase 1 | `pages/Candidate/Phase1.js` | `tests/Candidate/Phase1.spec.js` | Personal / Qualification / Experience Details | ✅ Validated |
-| Candidate — Phase 2 | `pages/Candidate/Phase2.js` | `tests/Candidate/Phase2.spec.js` | Document upload | ✅ Validated |
+| Manager Referral — Page | `pages/ManagerReferral/Page.js` | `tests/ManagerReferral/Page.spec.js` | Manager Referral form: field validation, submission | ✅ Validated — 53 tests |
+| Manager Referral — Report | `pages/ManagerReferral/Report.js` | `tests/ManagerReferral/Report.spec.js` | Referral report grid: filters, pagination | ✅ Validated — 18 tests (1 deliberately Pending, deferred — see TC_16) |
+| Candidate — Sign In | `pages/Candidate/SignUpSignIn.js` | `tests/Candidate/SignIn.spec.js` | Candidate sign-in, Forgot Password | ✅ Validated — 18 tests |
+| Candidate — Sign Up | `pages/Candidate/SignUpSignIn.js` | `tests/Candidate/SignUp.spec.js` | Candidate signup modal | ✅ Validated — 31 tests |
+| Candidate — Phase 1 | `pages/Candidate/Phase1.js` | `tests/Candidate/Phase1.spec.js` | Personal / Qualification / Experience Details | ✅ Validated — 119 tests |
+| Candidate — Phase 2 | `pages/Candidate/Phase2OtherDetails.js` (`ITAP_Phase2OtherDetailsPage` + `ITAP_Phase2UploadDocumentsPage`) | `tests/Candidate/Phase2.spec.js` | "1. Other Details" + "2. Upload Documents" (rewritten from scratch 2026-09-25 — the legacy `pages/Candidate/Phase2.js`/`ITAP_ContinueToPhase2Page` is kept only because `utils/CandidateFlowHelpers.js` and `utils/createFreshInterviewCandidate.js` still use it for the Interview/Onboarding candidate-creation flow, not for Phase 2's own test coverage) | ✅ Validated — 96 tests (2 deliberately Pending — TC_49 blocked by network policy, TC_91 needs a browser-trusted drag gesture not yet built) |
 | Interview — Setup | `pages/Interview/Setup.js` | `tests/Interview/Setup.spec.js` | Candidate search/select, Schedule Interview form, Allocate/Submit/Confirm | ✅ Validated |
 | Interview — Preview Interviewer Email | `pages/Interview/PreviewInterviewerEmail.js` | `tests/Interview/PreviewInterviewerEmail.spec.js` | Interviewer email preview tab | ✅ Validated |
 | Interview — Preview Candidate Email | `pages/Interview/PreviewCandidateEmail.js` | `tests/Interview/PreviewCandidateEmail.spec.js` | Candidate email preview tab | ✅ Validated |
@@ -107,26 +115,40 @@ playwright-js/
 ├── flowConfig.json                    # Frozen leftover from the removed scenario-picker UI — see note below
 ├── package.json
 ├── playwright.config.js
+├── project_context.md                 # Full per-module status, workflow, and technical lessons — read this first
+├── .env.example / .env                # Email notification feature credentials (.env is gitignored — see Notes)
+├── verify-gmail-smtp.js               # Standalone sanity-check for the email feature's Gmail SMTP path
 ├── server.js / dashboard.html / automation-dashboard.html / test-runner.html
 │                                       # Local dashboards: '/' redirects to automation-dashboard
-│                                       # (run tests, browse history); dashboard.html is a read-only
-│                                       # history viewer for runs made before the scenario picker was removed
+│                                       # (run tests, browse history, optional "email me when this run
+│                                       # finishes" notification with a PDF report attached — see Notes);
+│                                       # dashboard.html is a read-only history viewer for runs made
+│                                       # before the scenario picker was removed
 ├── excelReporter.js                   # Writes TestResults.xlsx + run-reports/*.json (once per run)
+├── Test Cases/                        # Source-of-truth Excel workbooks (one per module), incl.
+│                                       # Test Execution Overview.xlsx (cross-module pass/fail summary)
 ├── utils/
 │   ├── BrowserFactory.js              # Browser launch + shared low-level action helpers
 │   ├── Globals.js                     # Cross-test state (e.g. generated ITAP number)
-│   ├── CandidateFlowHelpers.js        # Shared candidate signup → Phase 1 driver functions
+│   ├── CandidateFlowHelpers.js        # Shared candidate signup → Phase 1 → Phase 2 driver functions
+│   ├── Phase2TestCandidates.js        # Pooled/disposable candidate accounts for the Phase 2 suite
 │   ├── DailyCandidateNaming.js        # Daily-incrementing test candidate names (test01, test02, ...)
 │   ├── DateHelpers.js                 # Future-date string helpers (keeps hardcoded dates from going stale)
 │   ├── createFreshInterviewCandidate.js    # Drives one candidate through signup → Phase 2 submission
-│   └── createClearedOnboardingCandidate.js # Drives a candidate through Interview to a given Final Status
+│   ├── createClearedOnboardingCandidate.js # Drives a candidate through Interview to a given Final Status
+│   └── upload-files/                  # Document images/PDFs used by Candidate Phase 1/2 uploads
+│                                       # (moved here from project root 2026-09-28)
 ├── pages/
 │   ├── BasePage.js                    # Shared Playwright action wrapper — FC Admin page objects extend this
 │   ├── FCAdminLogin.js                # Shared FC Admin login (used by both Interview and Onboarding)
+│   ├── ManagerReferral/
+│   │   ├── Page.js                    # Manager Referral form page object
+│   │   └── Report.js                  # Manager Referral report/grid page object
 │   ├── Candidate/
 │   │   ├── SignUpSignIn.js            # ITAP_LoginPage + ITAP_AlreadySignedUserPage
 │   │   ├── Phase1.js                  # ITAPInterviewPerformaPage + ITAP_QualificationDetailsPage + ITAP_ExperienceDetailPage
-│   │   └── Phase2.js                  # ITAP_ContinueToPhase2Page
+│   │   ├── Phase2.js                  # ITAP_ContinueToPhase2Page — legacy, kept only for CandidateFlowHelpers/createFreshInterviewCandidate
+│   │   └── Phase2OtherDetails.js      # ITAP_Phase2OtherDetailsPage + ITAP_Phase2UploadDocumentsPage — the real Phase 2 suite's page objects
 │   ├── Interview/
 │   │   ├── Setup.js                   # ITAP_InterviewSetup
 │   │   ├── PreviewInterviewerEmail.js # ITAP_PreviewInterviewerEmail
@@ -143,10 +165,14 @@ playwright-js/
 │   ├── Training.js                    # Training module
 │   └── OpenTraining.js                # Open Training module
 ├── tests/
+│   ├── ManagerReferral/
+│   │   ├── Page.spec.js               # Manager Referral form validation — 53 tests
+│   │   └── Report.spec.js             # Manager Referral report grid validation — 18 tests
 │   ├── Candidate/
-│   │   ├── SignUpSignIn.spec.js       # Signup + Sign-In validation
-│   │   ├── Phase1.spec.js             # Phase 1 validation
-│   │   └── Phase2.spec.js             # Phase 2 validation
+│   │   ├── SignIn.spec.js             # Sign-In validation — 18 tests
+│   │   ├── SignUp.spec.js             # Signup validation — 31 tests
+│   │   ├── Phase1.spec.js             # Phase 1 validation — 119 tests
+│   │   └── Phase2.spec.js             # Phase 2 validation ("1. Other Details" + "2. Upload Documents") — 96 tests
 │   ├── Interview/
 │   │   ├── Setup.spec.js              # Schedule Interview Form Validation, Multi-Candidate, Schedule Edge Cases
 │   │   ├── PreviewInterviewerEmail.spec.js # Interviewer email tab validation
@@ -162,7 +188,6 @@ playwright-js/
 │   │   └── DocumentVerification.spec.js    # HR portal: Verification Pending/Completed, Verify flow — its own module (2026-09-08)
 │   ├── Training.spec.js               # Training module
 │   └── OpenTraining.spec.js           # Open Training module
-└── upload-files/                      # Document images used by Candidate/*.spec.js uploads
 ```
 
 ## Setup
@@ -180,9 +205,17 @@ npm test
 
 # Run every Candidate file, or just one cluster
 npm run test:candidate
-npm run test:signupsignin
 npm run test:phase1
+npm run test:phase1:fast   # same, but HEADLESS=true (no visible browser)
 npm run test:phase2
+
+# Manager Referral, Sign In, and Sign Up currently have no dedicated npm
+# scripts (package.json's own test:signupsignin script is stale — it points
+# at tests/Candidate/SignUpSignIn.spec.js, which no longer exists now that
+# it's split into SignIn.spec.js + SignUp.spec.js) - run these directly:
+npx playwright test tests/ManagerReferral --headed
+npx playwright test tests/Candidate/SignIn.spec.js --headed
+npx playwright test tests/Candidate/SignUp.spec.js --headed
 
 # Run every Interview file, or just one cluster
 npm run test:interview
@@ -216,6 +249,26 @@ npm run dashboard
 
 Set `HEADLESS=true` in the environment before running tests or the dashboard to run
 without a visible browser window.
+
+### Optional: email notification when a run finishes
+
+The dashboard's "Email me when this run finishes" checkbox (next to "Run All") emails
+the exact same PDF report the "Download Report" button produces, once the run
+completes — useful for long runs you don't want to babysit. To enable it:
+
+1. Copy `.env.example` to `.env` (same folder) — `.env` is gitignored, real credentials
+   never get committed.
+2. Fill in `PERSONAL_GMAIL_ADDRESS` and `PERSONAL_GMAIL_APP_PASSWORD` (a Gmail App
+   Password from https://myaccount.google.com/apppasswords — requires 2-Step
+   Verification), and `COMPANY_EMAIL_ADDRESS` (the recipient). See `.env.example`'s own
+   comments and `project_context.md`'s "Dashboard feature: email notification on run
+   completion" section for why it's this direction (Gmail sends → company receives, not
+   the other way around — sending from a company Microsoft 365 account is blocked by
+   most orgs' IT policy).
+3. `node verify-gmail-smtp.js` sanity-checks the Gmail path in isolation, independent of
+   the full dashboard, if the feature ever needs re-diagnosing.
+
+Currently only wired to the single-module "Run All" button, not yet to "Run Everything".
 
 ## Notes
 

@@ -1,7 +1,10 @@
-﻿const express = require("express");
+﻿require("dotenv").config();
+const express = require("express");
 const { exec, spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const nodemailer = require("nodemailer");
+const { chromium } = require("playwright");
 
 const app = express();
 const reportsDir = path.join(__dirname, "run-reports");
@@ -440,7 +443,7 @@ app.get("/api/history", (req, res) => {
 // plumbing (currentRun, SSE broadcasts, stdout/stderr parsing). Extracted out of
 // the /api/run-tests route so /api/run-full-suite can also drive it, one project
 // at a time, awaiting each one's completion before starting the next.
-function startProjectRun(project, requestedTests, wantHeadless) {
+function startProjectRun(project, requestedTests, wantHeadless, notifyByEmail = false) {
     return new Promise((resolve, reject) => {
         if (currentRun || runReservation) {
             reject(new Error("A test run is already in progress."));
@@ -626,6 +629,7 @@ function startProjectRun(project, requestedTests, wantHeadless) {
                     order,
                     results,
                     requested: order.map((key) => testMeta.get(key)).filter(Boolean),
+                    notifyByEmail,
                 };
                 runReservation = false; // currentRun itself now guards the "already running" slot
 
@@ -730,9 +734,10 @@ app.post("/api/run-tests", async (req, res) => {
     // Per-run headless toggle from the dashboard takes precedence over the
     // server's HEADLESS env var (which remains the default when omitted).
     const wantHeadless = typeof req.body.headless === "boolean" ? req.body.headless : process.env.HEADLESS === "true";
+    const notifyByEmail = req.body.notifyByEmail === true;
 
     try {
-        const { runId, testCount, completion } = await startProjectRun(project, requestedTests, wantHeadless);
+        const { runId, testCount, completion } = await startProjectRun(project, requestedTests, wantHeadless, notifyByEmail);
         res.json({ ok: true, runId, testCount });
         completion.catch(() => {}); // errors are already broadcast over SSE
     } catch (error) {
@@ -842,6 +847,63 @@ app.post("/api/stop-tests", (req, res) => {
     exec(`taskkill /PID ${pid} /T /F`, () => {});
     res.json({ ok: true, message: "Stop signal sent." });
 });
+
+// ---- Email notification feature (added 2026-09-29) -----------------------
+// Renders the exact same PDF a human would get from the dashboard's own
+// "Download Report" button, WITHOUT reimplementing any of that button's
+// classification/formatting logic (assignCategoryIds, friendlyReason,
+// classifyTest, etc. - a long, easy-to-drift-from-the-real-thing chain of
+// client-only helpers). Instead: load the real dashboard page headlessly,
+// call its real buildDownloadableReportHtml() function directly in-page to
+// get the identical HTML the button would produce, then print THAT to PDF.
+// Guarantees the emailed report is always pixel-identical to what a human
+// downloading it manually would see, with zero duplicated logic to maintain.
+async function renderReportToPdf(historyEntry, projectId) {
+    const projectLabel = (PROJECTS[projectId] && PROJECTS[projectId].label) || projectId;
+    const browser = await chromium.launch({ headless: true });
+    try {
+        const page = await browser.newPage();
+        await page.goto("http://localhost:3000/automation-dashboard", { waitUntil: "load", timeout: 20000 });
+        const html = await page.evaluate(
+            ({ entry, label, pid }) => buildDownloadableReportHtml(entry, label, pid),
+            { entry: historyEntry, label: projectLabel, pid: projectId }
+        );
+        await page.setContent(html, { waitUntil: "load" });
+        const pdfBuffer = await page.pdf({ format: "A4", printBackground: true, margin: { top: "20px", bottom: "20px", left: "20px", right: "20px" } });
+        return pdfBuffer;
+    } finally {
+        await browser.close();
+    }
+}
+
+// Sends the given PDF via the confirmed-working fallback path (personal
+// Gmail as sender - company email as recipient; sending FROM the company
+// account is blocked by org IT policy, verified live 2026-09-29 with
+// verify-company-smtp.js/verify-gmail-smtp.js). Never throws - a failed
+// notification must never affect the test run's own recorded results.
+async function sendReportEmail(pdfBuffer, projectLabel, runId) {
+    const { PERSONAL_GMAIL_ADDRESS, PERSONAL_GMAIL_APP_PASSWORD, COMPANY_EMAIL_ADDRESS } = process.env;
+    if (!PERSONAL_GMAIL_ADDRESS || !PERSONAL_GMAIL_APP_PASSWORD || !COMPANY_EMAIL_ADDRESS) {
+        console.error(`[email-notify] Skipped - missing PERSONAL_GMAIL_ADDRESS/PERSONAL_GMAIL_APP_PASSWORD/COMPANY_EMAIL_ADDRESS in .env.`);
+        return;
+    }
+    try {
+        const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: { user: PERSONAL_GMAIL_ADDRESS, pass: PERSONAL_GMAIL_APP_PASSWORD },
+        });
+        await transporter.sendMail({
+            from: PERSONAL_GMAIL_ADDRESS,
+            to: COMPANY_EMAIL_ADDRESS,
+            subject: `ITAP Dashboard - ${projectLabel} - Run ${runId} finished`,
+            text: `The "${projectLabel}" test run (${runId}) has finished. The full report is attached as a PDF.`,
+            attachments: [{ filename: `${projectLabel.replace(/[^a-z0-9]+/gi, "-")}-report-${runId}.pdf`, content: pdfBuffer }],
+        });
+        console.log(`[email-notify] Report emailed successfully for run ${runId}.`);
+    } catch (err) {
+        console.error(`[email-notify] Failed to send for run ${runId}:`, err.message);
+    }
+}
 
 async function finalizeRun(projectId, runId, jsonOut, exitCode) {
     const run = currentRun;
@@ -1049,6 +1111,16 @@ async function finalizeRun(projectId, runId, jsonOut, exitCode) {
 
     currentRun = null;
     broadcast("run-complete", historyEntry);
+
+    if (run.notifyByEmail) {
+        // Fire-and-forget from the caller's perspective (nothing awaits
+        // finalizeRun's return value) - but sequenced internally so the PDF
+        // render + send happen after run-complete is already broadcast,
+        // never blocking or delaying it. sendReportEmail() never throws.
+        renderReportToPdf(historyEntry, projectId)
+            .then((pdf) => sendReportEmail(pdf, (PROJECTS[projectId] && PROJECTS[projectId].label) || projectId, runId))
+            .catch((err) => console.error(`[email-notify] PDF render failed for run ${runId}:`, err.message));
+    }
 }
 
 app.listen(3000, () => {

@@ -153,6 +153,10 @@
         <div class="meta" id="projMeta"></div>
       </div>
       <div class="header-actions">
+        <label style="display:inline-flex; align-items:center; gap:6px; margin-right:6px; font-size:0.85em; color:#333; cursor:pointer; white-space:nowrap;">
+          <input type="checkbox" id="emailNotifyCheckbox" style="width:15px; height:15px; cursor:pointer;">
+          Email me when this run finishes
+        </label>
         <button class="btn ghost" id="toggleOptionsBtn">Run Options</button>
         <button class="btn primary" id="runAllBtn">▶ Run All</button>
         <button class="btn ghost" id="stopBtn" disabled>■ Stop</button>
@@ -1281,7 +1285,7 @@ async function startRun(tests) {
     const response = await fetch('/api/run-tests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project: currentProjectId, tests, headless: wantHeadless }),
+      body: JSON.stringify({ project: currentProjectId, tests, headless: wantHeadless, notifyByEmail: document.getElementById('emailNotifyCheckbox').checked }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Run failed to start.');
@@ -1314,7 +1318,7 @@ runFullSuiteBtn.addEventListener('click', async () => {
     const response = await fetch('/api/run-full-suite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ headless: wantHeadless }),
+      body: JSON.stringify({ headless: wantHeadless, notifyByEmail: document.getElementById('emailNotifyCheckbox').checked }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Could not start the full run.');
